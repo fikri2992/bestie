@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Chat</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div class="tab-container">
+        <button class="tab active" data-target="chat">Chat</button>
+        <button class="tab" data-target="settings">Settings</button>
+    </div>
+
+    <div class="content-container">
+        <div id="chat" class="content active">
+            <div class="chat-container">
+                <div class="chat-header">
+                    <h2>Chat</h2>
+                </div>
+                <div class="chat-messages">
+                </div>
+                <div class="chat-input">
+                    <input type="text" placeholder="Type your message...">
+                    <button>Send</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="settings" class="content">
+            <p>Settings content will go here.</p>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

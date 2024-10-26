@@ -1,0 +1,129 @@
+/* Basic styling for the chat UI */
+body {
+    font-family: sans-serif;
+    margin: 0;
+}
+
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 400px;
+    /* Adjust as needed */
+    width: 300px;
+    /* Adjust as needed */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.chat-header {
+    background-color: #f0f0f0;
+    padding: 10px;
+    border-bottom: 1px solid #ccc;
+}
+
+.chat-messages {
+    flex-grow: 1;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.chat-input {
+    display: flex;
+    padding: 10px;
+    border-top: 1px solid #ccc;
+}
+
+.chat-input input {
+    flex-grow: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.chat-input button {
+    padding: 8px 15px;
+    background-color: #4CAF50;
+    /* Green */
+    border: none;
+    color: white;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin-left: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+/* ... (previous styles) ... */
+
+/* Message bubbles */
+.message {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 80%;
+    /* Adjust as needed */
+    clear: both;
+    /* Ensure bubbles stack properly */
+}
+
+.user {
+    background-color: #DCF8C6;
+    /* Light green for user */
+    float: right;
+    /* Align user messages to the right */
+}
+
+.server {
+    background-color: #f0f0f0;
+    /* Light gray for server */
+    float: left;
+    /* Align server messages to the left */
+}
+
+/* ... (previous styles) ... */
+
+/* Tab styling */
+.tab-container {
+    display: flex;
+    background-color: #f1f1f1;
+    border-bottom: 1px solid #ccc;
+}
+
+.tab {
+    flex-grow: 1;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    background-color: inherit;
+    border: none;
+    border-bottom: 2px solid transparent;
+}
+
+.tab.active {
+    border-bottom: 2px solid #4CAF50;
+    /* Green */
+}
+
+/* Content area styling */
+.content-container {
+    padding: 10px;
+    display: flex;
+    /* Enable flexbox for content-container */
+    flex-direction: column;
+    /* Stack children vertically */
+    min-height: 400px;
+    /* Set minimum height for the container */
+}
+
+.content {
+    /* Remove display: none; to prevent content from collapsing */
+    flex-grow: 1;
+    /* Allow content areas to fill available space */
+}
+
+.content.active {
+    display: block;
+    /* Show the active content area */
+}
