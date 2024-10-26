@@ -19,43 +19,51 @@ const ImageCensor = (() => {
             )
         );
 
-    const getBaseUrl = (url) => {
-        try {
-            if (url.startsWith('data:')) {
-                return url;
+        const getBaseUrl = (url) => {
+            try {
+                // Check for common invalid URL patterns
+                if (!url || url.startsWith('--') || url.startsWith('chrome-extension://')) {
+                    return null; // Or return a default value
+                }
+                if (url.startsWith('data:')) {
+                    return url;
+                }
+                const urlObj = new URL(url);
+                return urlObj.origin + urlObj.pathname;
+            } catch (error) {
+                console.error('Invalid URL:', url, error);
+                return null; // Or return a default value
             }
-            const urlObj = new URL(url);
-            return urlObj.origin + urlObj.pathname;
-        } catch (error) {
-            console.error('Invalid URL:', url, error);
-            return url;
-        }
-    };
+        };
+        
 
-    const blurImage = state => image => {
-        const baseUrl = getBaseUrl(image.src);
-        if (!state.censorEnabled || image.dataset.censored || state.revealedImages[baseUrl]) return image;
+    const blurElement = state => element => {
+        const imageUrl = element.tagName === 'IMG' ? element.src : element.style.backgroundImage.slice(4, -1).replace(/"/g, "");
+        const baseUrl = getBaseUrl(imageUrl);
+        if (!state.censorEnabled || element.dataset.censored || state.revealedImages[baseUrl]) return element;
 
-        const isSmallImage = image.width < 128 && image.height < 128;
-        if (isSmallImage) return image;
+        // Check if the element has a background image and is large enough
+        const isLargeEnough = element.offsetWidth >= 128 && element.offsetHeight >= 128;
+        if (!imageUrl || !isLargeEnough) return element;
 
-        image.dataset.censored = "true";
-        image.style.filter = `blur(${state.blurIntensity}px)`;
-        image.style.transition = "none"; // Remove transition for instant blur
+        element.dataset.censored = "true";
+        element.style.filter = `blur(${state.blurIntensity}px)`;
+        element.style.transition = "none";
 
-        const parentElement = image.parentElement;
+        const parentElement = element.parentElement;
         if (parentElement && window.getComputedStyle(parentElement).position === "static") {
             parentElement.style.position = "relative";
         }
 
-        image.addEventListener("load", () => {
+        element.addEventListener("load", () => {
             if (!state.revealedImages[baseUrl]) {
-                image.style.filter = `blur(${state.blurIntensity}px)`;
+                element.style.filter = `blur(${state.blurIntensity}px)`;
             }
         });
 
-        return image;
+        return element;
     };
+
 
     const updateRevealedImages = state =>
         new Promise(resolve =>
@@ -65,15 +73,15 @@ const ImageCensor = (() => {
         );
 
     const censorAllImages = state => {
-        const images = Array.from(document.querySelectorAll("img"));
-        images.forEach(blurImage(state));
+        const images = Array.from(document.querySelectorAll("img, div[style*='background-image']"));
+        images.forEach(blurElement(state));
     };
 
     const removeAllCensors = () => {
-        const images = Array.from(document.querySelectorAll("img[data-censored]"));
-        images.forEach(image => {
-            image.style.filter = "none";
-            delete image.dataset.censored;
+        const elements = Array.from(document.querySelectorAll("[data-censored]"));
+        elements.forEach(element => {
+            element.style.filter = "none";
+            delete element.dataset.censored;
         });
     };
 
@@ -81,13 +89,16 @@ const ImageCensor = (() => {
         const observer = new MutationObserver(mutations => {
             mutations.forEach(mutation => {
                 mutation.addedNodes.forEach(node => {
-                    if (node.tagName === "IMG") {
-                        blurImage(state)(node);
-                    }
-                    if (node.querySelectorAll) {
-                        const newImages = Array.from(node.querySelectorAll("img"));
-                        newImages.forEach(blurImage(state));
-                    }
+                    // Delay the check for new images
+                    setTimeout(() => { 
+                        if (node.tagName === "IMG" || (node.tagName === "DIV" && node.style.backgroundImage)) {
+                            blurElement(state)(node);
+                        }
+                        if (node.querySelectorAll) {
+                            const newImages = Array.from(node.querySelectorAll("img, div[style*='background-image']"));
+                            newImages.forEach(blurElement(state));
+                        }
+                    }, 500); // Adjust delay (in milliseconds) as needed 
                 });
             });
         });
@@ -126,9 +137,10 @@ const ImageCensor = (() => {
                     removeAllCensors(newState); // Remove censor from all images
                 });
             } else if (message.action === "revealImage") {
-                const image = Array.from(document.images).find(img => img.src === message.srcUrl);
+                const imageUrl = message.srcUrl;
+                const image = Array.from(document.querySelectorAll(`img[src="${imageUrl}"], div[style*='background-image="${imageUrl}']`)).find(el => el);
                 if (image) {
-                    const baseUrl = getBaseUrl(image.src);
+                    const baseUrl = getBaseUrl(imageUrl);
                     image.style.filter = "none";
                     state.revealedImages[baseUrl] = true;
                     updateRevealedImages(state);
