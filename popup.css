@@ -27,22 +27,52 @@ body {
     overflow-y: auto;
 }
 
+/* popup.css */
+
 .chat-input {
     display: flex;
+    align-items: center;
     padding: 10px;
     border-top: 1px solid #ccc;
 }
 
+.input-group {
+    display: flex;
+    align-items: center;
+    background-color: #f0f0f0;
+    border-radius: 20px;
+    flex: 1;
+    margin-right: 10px;
+}
+
+.input-text {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background-color: transparent;
+    border-radius: 20px;
+}
+
+.input-text:focus {
+    outline: none;
+}
+
+.input-attach {
+    cursor: pointer;
+    padding: 10px;
+}
+
+
 .chat-input input {
     flex-grow: 1;
     padding: 8px;
-    border: 1px solid #ccc;
+    /* border: 1px solid #ccc; */
     border-radius: 5px;
 }
 
 .chat-input button {
     padding: 8px 15px;
-    background-color: #4CAF50;
+    background-color: #007AFF;
     /* Green */
     border: none;
     color: white;
@@ -224,3 +254,4 @@ body {
         width: 0;
     }
 }
+

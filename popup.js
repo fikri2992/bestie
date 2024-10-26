@@ -97,11 +97,11 @@ chatInput.addEventListener('keyup', (event) => {
 
 clearChatButton.addEventListener('click', clearChat);
 
-attachImageButton.addEventListener('click', () => {
-    imageUpload.click(); // Trigger the hidden file input
-});
+// attachImageButton.addEventListener('click', () => {
+//     imageUpload.click(); // Trigger the hidden file input
+// });
 
-imageUpload.addEventListener('change', handleImageUpload);
+// imageUpload.addEventListener('change', handleImageUpload);
 
 
 
