@@ -57,29 +57,40 @@ body {
 
 /* ... (previous styles) ... */
 
+/* Content area styling */
+.content-container {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+    min-width: 300px;
+
+    /* Increased minimum width */
+}
+
 /* Message bubbles */
 .message {
     margin-bottom: 10px;
     padding: 10px;
-    border-radius: 10px;
+    border-radius: 18px;
     max-width: 80%;
-    /* Adjust as needed */
     clear: both;
-    /* Ensure bubbles stack properly */
 }
 
 .user {
-    background-color: #DCF8C6;
-    /* Light green for user */
+    background-color: #007AFF;
+    /* Blue bubble for user */
+    color: white;
+    /* White text color */
     float: right;
-    /* Align user messages to the right */
 }
 
 .server {
-    background-color: #f0f0f0;
-    /* Light gray for server */
+    background-color: #E5E5EA;
+    /* Light gray bubble for server */
+    color: black;
+    /* Black text color for better contrast */
     float: left;
-    /* Align server messages to the left */
 }
 
 /* ... (previous styles) ... */
@@ -126,4 +137,60 @@ body {
 .content.active {
     display: block;
     /* Show the active content area */
+}
+
+/* ... (previous styles) ... */
+
+/* Scrollbar styling for Chrome, Edge, and Safari */
+.chat-messages::-webkit-scrollbar {
+    width: 5px;
+    /* Set the width of the scrollbar */
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+    /* Make the track transparent */
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background-color: #D1D5DB;
+    /* Set the color of the scrollbar thumb */
+    border-radius: 20px;
+    /* Make the thumb rounded */
+}
+
+/* Scrollbar styling for Firefox */
+.chat-messages {
+    scrollbar-width: thin;
+    /* Make the scrollbar thin for Firefox */
+    scrollbar-color: #D1D5DB transparent;
+    /* Thumb color, track color */
+}
+
+/* ... (other styles) ... */
+
+/* Clear Chat button styling */
+#clearChatButton {
+    background-color: #FF6347;
+    /* Light red background */
+    color: white;
+    /* White text color */
+    border: none;
+    /* Remove default border */
+    padding: 8px 16px;
+    /* Add some padding */
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    border-radius: 5px;
+    /* Add rounded corners */
+    cursor: pointer;
+    /* Change cursor to pointer on hover */
+}
+
+/* Optional: Hover effect */
+#clearChatButton:hover {
+    background-color: #FF4500;
+    /* Darker red on hover */
 }

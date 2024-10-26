@@ -4,9 +4,10 @@
     "version": "1.0",
     "description": "A simple chat extension",
     "permissions": [
-        "storage" 
+        "storage"
     ],
     "action": {
         "default_popup": "popup.html"
     }
+    
 }
