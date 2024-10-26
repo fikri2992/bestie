@@ -59,7 +59,9 @@ const ImageCensor = (() => {
 
     const updateRevealedImages = state =>
         new Promise(resolve =>
-            chrome.storage.local.set({ revealedImages: state.revealedImages }, () => resolve(state))
+            chrome.storage.local.set({
+                revealedImages: state.revealedImages
+            }, () => resolve(state))
         );
 
     const censorAllImages = state => {
@@ -105,16 +107,16 @@ const ImageCensor = (() => {
                 blurIntensity: newState.blurIntensity
             }, () => resolve(newState))
         );
-
     const setupMessageListener = state => {
-        chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-            if (message.action === "enableCensor") {
-                const newState = {
-                    ...state,
-                    censorEnabled: true
-                };
-                updateEnabledState(newState).then(() => censorAllImages(newState));
-            } else if (message.action === "disableCensor") {
+        chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
+            console.log('Message received in content script:', message);
+            if (message.action === 'enableCensor') {
+                    const newState = {
+                        ...state,
+                        censorEnabled: true
+                    };
+                    updateEnabledState(newState).then(() => censorAllImages(newState));
+            } else if (message.action === 'disableCensor') {
                 const newState = {
                     ...state,
                     censorEnabled: false,
@@ -135,7 +137,6 @@ const ImageCensor = (() => {
             }
         });
     };
-
     const init = async () => {
         const state = await loadSettings();
         setupMessageListener(state);
@@ -151,4 +152,3 @@ const ImageCensor = (() => {
 })();
 
 ImageCensor.init();
-

@@ -11,7 +11,6 @@ function loadChatMessages() {
     //console log all storage local
     chrome.storage.local.get(['chatMessages'], (result) => {
         if (result.chatMessages) {
-            console.log(result)
             chatMessages.innerHTML = ''; // Clear existing messages
             result.chatMessages.forEach(message => {
                 addMessage(message.text, message.sender, message.imageData);
@@ -96,14 +95,6 @@ chatInput.addEventListener('keyup', (event) => {
 });
 
 clearChatButton.addEventListener('click', clearChat);
-
-// attachImageButton.addEventListener('click', () => {
-//     imageUpload.click(); // Trigger the hidden file input
-// });
-
-// imageUpload.addEventListener('change', handleImageUpload);
-
-
 
 // Receive message (including potential image data)
 socket.on('chat message', (data) => {
@@ -245,29 +236,29 @@ contentAreas.forEach((area, index) => {
 
 document.addEventListener('DOMContentLoaded', function () {
     const censorToggle = document.getElementById('censorToggle');
-
     // Initialize the toggle based on stored settings
     chrome.storage.local.get(['censorEnabled'], function (result) {
         censorToggle.checked = result.censorEnabled !== false;
     });
 
     censorToggle.addEventListener('change', function () {
-        if (censorToggle.checked) {
-            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-                var activeTab = tabs[0];
-                chrome.tabs.sendMessage(activeTab.id, { action: 'enableCensor' }, function (response) {
+        // Get the active tab
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+            const activeTab = tabs[0];
+            if (activeTab && activeTab.id) {
+                const action = censorToggle.checked ? 'enableCensor' : 'disableCensor';
+                chrome.tabs.sendMessage(activeTab.id, { action: action }, function (response) {
                     if (chrome.runtime.lastError) {
-                        console.log(chrome.runtime.lastError)
                         console.error('Error sending message to content script:', chrome.runtime.lastError);
                     } else {
-                        console.log('Censor enabled');
+                        console.log(`Censor ${action === 'enableCensor' ? 'enabled' : 'disabled'}`);
                     }
                 });
-            });
-            chrome.storage.local.set({ censorEnabled: true });
-        } else {
-            chrome.runtime.sendMessage({ action: 'disableCensor' });
-            chrome.storage.local.set({ censorEnabled: false });
-        }
+                chrome.storage.local.set({ censorEnabled: censorToggle.checked });
+            } else {
+                console.error('No active tab found');
+            }
+        });
     });
 });
+
