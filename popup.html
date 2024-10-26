@@ -43,8 +43,17 @@
                 </div>
             </div>
         </div>
-        <div id="settings" class="content">
-            <button id="clearChatButton">Clear Chat</button>
+        <div id="settings" class="content flex">
+            <div>
+                <button id="clearChatButton">Clear Chat</button>
+            </div>
+            <div class="mt-4 justify-center">
+                <label for="censorToggle" class="mt-2">Enable Image Censor</label>
+                <label class="switch">
+                    <input type="checkbox" id="censorToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
         </div>
     </div>
     <script src="./socket.io.min.js"></script>

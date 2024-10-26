@@ -242,3 +242,32 @@ contentAreas.forEach((area, index) => {
         area.style.display = 'block'; // Ensure the first tab is visible
     }
 });
+
+document.addEventListener('DOMContentLoaded', function () {
+    const censorToggle = document.getElementById('censorToggle');
+
+    // Initialize the toggle based on stored settings
+    chrome.storage.local.get(['censorEnabled'], function (result) {
+        censorToggle.checked = result.censorEnabled !== false;
+    });
+
+    censorToggle.addEventListener('change', function () {
+        if (censorToggle.checked) {
+            chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+                var activeTab = tabs[0];
+                chrome.tabs.sendMessage(activeTab.id, { action: 'enableCensor' }, function (response) {
+                    if (chrome.runtime.lastError) {
+                        console.log(chrome.runtime.lastError)
+                        console.error('Error sending message to content script:', chrome.runtime.lastError);
+                    } else {
+                        console.log('Censor enabled');
+                    }
+                });
+            });
+            chrome.storage.local.set({ censorEnabled: true });
+        } else {
+            chrome.runtime.sendMessage({ action: 'disableCensor' });
+            chrome.storage.local.set({ censorEnabled: false });
+        }
+    });
+});
