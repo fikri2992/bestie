@@ -194,3 +194,15 @@ body {
     background-color: #FF4500;
     /* Darker red on hover */
 }
+
+/* ... other styles ... */
+
+/* Image preview in chat */
+.image-preview {
+    max-width: 200px;
+    /* Adjust as needed */
+    max-height: 150px;
+    /* Adjust as needed */
+    border-radius: 5px;
+    margin-bottom: 5px;
+}
