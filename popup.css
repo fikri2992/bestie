@@ -59,7 +59,7 @@ body {
 
 /* Content area styling */
 .content-container {
-    padding: 10px;
+    /* padding: 10px; */
     display: flex;
     flex-direction: column;
     min-height: 400px;
@@ -117,16 +117,6 @@ body {
     /* Green */
 }
 
-/* Content area styling */
-.content-container {
-    padding: 10px;
-    display: flex;
-    /* Enable flexbox for content-container */
-    flex-direction: column;
-    /* Stack children vertically */
-    min-height: 400px;
-    /* Set minimum height for the container */
-}
 
 .content {
     /* Remove display: none; to prevent content from collapsing */
@@ -205,4 +195,32 @@ body {
     /* Adjust as needed */
     border-radius: 5px;
     margin-bottom: 5px;
+}
+
+#settings {
+    padding: 10px;
+}
+
+.typing-dots {
+    display: inline-block;
+    width: 20px;
+    /* Adjust width as needed */
+    overflow: hidden;
+    white-space: nowrap;
+    animation: typing 1s steps(3) infinite;
+    /* Adjust animation duration and steps as needed */
+}
+
+@keyframes typing {
+    0% {
+        width: 0;
+    }
+
+    50% {
+        width: 100%;
+    }
+
+    100% {
+        width: 0;
+    }
 }

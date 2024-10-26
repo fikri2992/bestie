@@ -4,7 +4,7 @@
 <head>
     <title>Chat</title>
     <link rel="stylesheet" href="popup.css">
-
+    <link href="tailwind.min.css" rel="stylesheet">
 </head>
 
 <body>
@@ -24,8 +24,13 @@
                 <div class="chat-input">
                     <input type="text" placeholder="Type your message...">
                     <input type="file" id="imageUpload" accept="image/*" style="display: none;"> 
-                    <button id="attachImageButton">📎</button> 
-                    <button>Send</button>
+                    <button id="attachImageButton">
+                        <img src="./icons/upload.svg" alt="Send" style="width: 1em;"> 
+
+                    </button>
+                    <button class="send-button">
+                        <img src="./icons/send.svg" alt="Send" style="width: 1em;"> 
+                    </button>
                 </div>
             </div>
         </div>
@@ -38,3 +43,5 @@
 </body>
 
 </html>
+
+

@@ -1,52 +1,48 @@
 // Get DOM elements
 const chatMessages = document.querySelector('.chat-messages');
 const chatInput = document.querySelector('.chat-input input');
-const sendButton = document.querySelector('.chat-input button');
+const sendButton = document.querySelector('.send-button');
 const clearChatButton = document.getElementById('clearChatButton');
 const attachImageButton = document.getElementById('attachImageButton');
 const imageUpload = document.getElementById('imageUpload');
-
-// Function to add a new message to the chat
-
-function addMessage(message, sender, imageData = null) {
-    const messageElement = document.createElement('div');
-    messageElement.classList.add('message', sender);
-
-
-    if (imageData) {
-        // If image data is provided, create an image element
-        const imageElement = document.createElement('img');
-        imageElement.src = imageData;
-        imageElement.classList.add('image-preview');
-        messageElement.appendChild(imageElement);
-    } else {
-        // Otherwise, just add the text message
-        messageElement.textContent = message;
-    }
-
-    chatMessages.appendChild(messageElement);
-
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
+const socket = io('http://localhost:3000');
 // Function to load chat messages from storage
 function loadChatMessages() {
-
-
-
-
-
-
-
-
+    //console log all storage local
     chrome.storage.local.get(['chatMessages'], (result) => {
         if (result.chatMessages) {
+            console.log(result)
             chatMessages.innerHTML = ''; // Clear existing messages
             result.chatMessages.forEach(message => {
                 addMessage(message.text, message.sender, message.imageData);
             });
         }
     });
+
+
+} // Replace with your server address
+loadChatMessages();
+// Function to add a new message to the chat
+function addMessage(message, sender, messageData = null) {
+    // Create the message container element first
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message', sender);
+    chatMessages.appendChild(messageElement);
+
+    if (messageData) {
+        if (messageData.imageData) {
+            const imageElement = document.createElement('img');
+            imageElement.src = messageData.imageData;
+            imageElement.classList.add('image-preview');
+            messageElement.appendChild(imageElement);
+        }
+        if (messageData.text) {
+            messageElement.textContent = messageData.text;
+        }
+    } else {
+        messageElement.textContent = message;
+    }
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // Function to save chat messages to storage
@@ -92,14 +88,12 @@ sendButton.addEventListener('click', () => {
     saveChatMessages(); // Save messages after sending
 });
 
-
 chatInput.addEventListener('keyup', (event) => {
     if (event.key === 'Enter') {
         sendMessage();
         saveChatMessages(); // Save messages after sending
     }
 });
-
 
 clearChatButton.addEventListener('click', clearChat);
 
@@ -109,43 +103,116 @@ attachImageButton.addEventListener('click', () => {
 
 imageUpload.addEventListener('change', handleImageUpload);
 
-// Load chat messages when the popup opens
-loadChatMessages();
 
-// Connect to the Socket.IO server
-const socket = io('http://localhost:3000'); // Replace with your server address
-
-// Function to send the message
-function sendMessage() {
-    const message = chatInput.value.trim();
-    if (message !== "") {
-        addMessage(message, 'user');
-        try {
-            // Send the message to the server
-            socket.emit('chat message', {
-                text: message
-            });
-        } catch (error) {
-            console.error('Error sending message:', error);
-            // Optionally, display an error message to the user
-            addMessage('Error sending message. Please try again later.', 'server');
-        } finally {
-            // Clear input field regardless of success or failure
-            chatInput.value = "";
-        }
-    }
-}
 
 // Receive message (including potential image data)
 socket.on('chat message', (data) => {
-    if (data.imageData) {
-        addMessage(null, 'server', data.imageData); // Display received image
-    } else {
-        addMessage(data.text, 'server'); // Display text message
-    }
-    saveChatMessages(); // Save messages after receiving
-});
+    // Add the typing animation before displaying the message
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message', 'server');
+    chatMessages.appendChild(messageElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Add typing animation (three dots)
+    const typingDots = document.createElement('span');
+    typingDots.classList.add('typing-dots');
+    typingDots.innerHTML = '...'; // Start with one dot
+    messageElement.appendChild(typingDots);
+    // Simulate typing animation
+    let dotCount = 1;
+    const typingInterval = setInterval(() => {
+        dotCount = (dotCount + 1) % 4; // Cycle through 1, 2, 3, 0 dots
+        typingDots.innerHTML = '.'.repeat(dotCount);
+    }, 300);
+    // Simulate a delay (e.g., for network request)
+    setTimeout(() => {
+        clearInterval(typingInterval); // Stop the animation
+        typingDots.remove(); // Remove the dots
+        // Get the last message element (which is the placeholder with typing animation)
+        const lastMessageElement = chatMessages.lastElementChild;
+        // Update the last message element with the actual message content
+        if (data.imgUrl) {
+            const imageElement = document.createElement('img');
+            imageElement.src = data.imgUrl;
+            imageElement.classList.add('image-preview');
+            lastMessageElement.innerHTML = ''; // Clear the placeholder content
+            lastMessageElement.appendChild(imageElement);
+        } else {
+            lastMessageElement.textContent = data.text; // Update text content
+        }
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        saveChatMessages(); // Save messages after receiving
+    }, 700); // Adjust delay as needed
 
+
+});
+// Function to send the message
+function sendMessage() {
+    const messageText = chatInput.value.trim();
+    const messageData = {}; // Start with an empty object
+
+    // Determine message type
+    if (imageUpload.files.length > 0 && messageText !== "") {
+        messageData.type = 'text_image'; // Both text and image
+    } else if (imageUpload.files.length > 0) {
+        messageData.type = 'image'; // Image only
+    } else {
+        messageData.type = 'text'; // Text only
+    }
+
+    // Add text content (if any)
+    if (messageText !== "") {
+        messageData.text = messageText;
+    }
+
+    // Handle image upload (if any)
+    if (imageUpload.files.length > 0) {
+        const file = imageUpload.files[0];
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            messageData.imageData = e.target.result;
+            sendMessageToServer(messageData);
+        };
+        reader.readAsDataURL(file);
+    } else {
+        // Send text-only message immediately
+        sendMessageToServer(messageData);
+    }
+}
+
+// Function to send the message to the server
+function sendMessageToServer(messageData) {
+    sendPayload(messageData);
+    addMessage('You', 'user', messageData);
+    chatInput.value = '';
+    imageUpload.value = ''; // Clear the file input
+}
+
+async function sendPayload(messageData) {
+    try {
+        const response = await fetch('http://localhost:3000/api/message', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+                // Add any other headers your API requires, like authorization
+            },
+            body: JSON.stringify(messageData)
+        });
+
+        if (!response.ok) {
+            throw new Error(`API request failed with status ${response.status}`);
+        }
+
+    } catch (error) {
+        console.error('Error sending message:', error);
+        // Handle the error, e.g., display an error message to the user
+        // addMessage('Error sending message. Please try again later.', 'server');
+    } finally {
+        // Clear input fields
+        chatInput.value = '';
+        imageUpload.value = '';
+    }
+
+}
 // Tab switching logic
 const tabs = document.querySelectorAll('.tab');
 const contentAreas = document.querySelectorAll('.content');
@@ -174,9 +241,4 @@ contentAreas.forEach((area, index) => {
     } else {
         area.style.display = 'block'; // Ensure the first tab is visible
     }
-});
-
-// Listen for incoming messages from the server
-socket.on('chat message', (msg) => {
-    addMessage(msg, 'server');
 });
