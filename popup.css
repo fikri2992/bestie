@@ -19,6 +19,7 @@ body {
     background-color: #f0f0f0;
     padding: 10px;
     border-bottom: 1px solid #ccc;
+    text-align: center;
 }
 
 .chat-messages {
@@ -300,3 +301,18 @@ input:checked+.slider {
 input:checked+.slider:before {
     transform: translateX(26px);
 }
+
+/* Settings styles */
+.settings-container {
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center; /* Align items to the same baseline */
+    justify-content: space-between; /* Even spacing between label and switch */
+    margin-bottom: 10px; 
+}
+
