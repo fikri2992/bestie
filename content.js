@@ -39,6 +39,12 @@ const ImageCensor = (() => {
 
     const blurElement = state => element => {
         const imageUrl = element.tagName === 'IMG' ? element.src : element.style.backgroundImage.slice(4, -1).replace(/"/g, "");
+        
+        // Check if imageUrl is a valid URL
+        if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:') && !imageUrl.startsWith('blob:')) {
+            return element; // Skip processing if not a valid URL
+        }
+
         const baseUrl = getBaseUrl(imageUrl);
         if (!state.censorEnabled || element.dataset.censored || state.revealedImages[baseUrl]) return element;
 
@@ -118,15 +124,33 @@ const ImageCensor = (() => {
                 blurIntensity: newState.blurIntensity
             }, () => resolve(newState))
         );
+    const uncensorImage = (state, imageUrl) => {
+        const image = Array.from(document.querySelectorAll(`img[src="${imageUrl}"][data-censored], div[data-censored]`)).find(el => {
+            if (el.tagName === 'IMG') {
+                return el; // Return the element if it's an img
+            }
+            const backgroundImage = el.style.backgroundImage;
+            return backgroundImage.includes(`url("${imageUrl}")`) || backgroundImage.includes(`url('${imageUrl}')`);
+        });
+
+        if (image) {
+            const baseUrl = getBaseUrl(imageUrl);
+            image.style.filter = "none";
+            state.revealedImages[baseUrl] = true;
+            updateRevealedImages(state);
+            delete image.dataset.censored;
+        }
+    };
+
     const setupMessageListener = state => {
         chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             console.log('Message received in content script:', message);
             if (message.action === 'enableCensor') {
-                    const newState = {
-                        ...state,
-                        censorEnabled: true
-                    };
-                    updateEnabledState(newState).then(() => censorAllImages(newState));
+                const newState = {
+                    ...state,
+                    censorEnabled: true
+                };
+                updateEnabledState(newState).then(() => censorAllImages(newState));
             } else if (message.action === 'disableCensor') {
                 const newState = {
                     ...state,
@@ -137,24 +161,10 @@ const ImageCensor = (() => {
                     removeAllCensors(newState); // Remove censor from all images
                 });
             } else if (message.action === "revealImage") {
-                const imageUrl = message.srcUrl;
-                console.log('Received image URL:', imageUrl);
-                const image = Array.from(document.querySelectorAll(`img[src="${imageUrl}"][data-censored], div[data-censored]`)).find(el => {
-                    const backgroundImage = el.style.backgroundImage;
-                    return backgroundImage.includes(`url("${imageUrl}")`) || backgroundImage.includes(`url('${imageUrl}')`);
-                });
-                
-                if (image) {
-                    const baseUrl = getBaseUrl(imageUrl);
-                    image.style.filter = "none";
-                    state.revealedImages[baseUrl] = true;
-                    updateRevealedImages(state);
-                    delete image.dataset.censored;
-                }
+                uncensorImage(state, message.srcUrl);
             }
         });
-    };
-    const init = async () => {
+    };    const init = async () => {
         const state = await loadSettings();
         setupMessageListener(state);
         observeNewImages(state);

@@ -1,3 +1,13 @@
+:root {
+    --primary-color: #007AFF;
+    --primary-color-hover: #0062cc;
+    --text-color: #333;
+    --label-color: #555;
+    --input-border-color: #ccc;
+    --danger-color: #ff4d4d;
+    --danger-color-hover: #cc0000;
+}
+
 /* Basic styling for the chat UI */
 body {
     font-family: sans-serif;
@@ -316,3 +326,83 @@ input:checked+.slider:before {
     margin-bottom: 10px; 
 }
 
+
+/* ... (your existing styles) ... */
+
+/* Profile Form Styling */
+#profileForm {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%; /* Ensure form takes full popup height */
+}
+
+.form-container {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
+    text-align: center;
+}
+
+.form-container h2 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.form-container label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-container input[type="text"],
+.form-container input[type="number"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+    margin-bottom: 15px;
+}
+
+.form-container button {
+    background-color: var(--primary-color);
+    color: #fff;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.form-container button:hover {
+    background-color: var(--primary-color-hover);
+}
+.danger-button {
+    background-color: #ff4d4d;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 10px 0;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.danger-button:hover {
+    background-color: #cc0000;
+}
+
+.form-container input[type="text"]:focus,
+.form-container input[type="number"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 5px rgba(0, 122, 255, 0.5);
+}

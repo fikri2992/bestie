@@ -235,6 +235,11 @@ contentAreas.forEach((area, index) => {
 });
 
 document.addEventListener('DOMContentLoaded', function () {
+    initializeCensorToggle();
+    checkUserProfile();
+});
+
+function initializeCensorToggle() {
     const censorToggle = document.getElementById('censorToggle');
     // Initialize the toggle based on stored settings
     chrome.storage.local.get(['censorEnabled'], function (result) {
@@ -260,5 +265,60 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
-});
+}
 
+function checkUserProfile() {
+    chrome.storage.local.get(['displayName', 'age'], (result) => {
+        const chatInterface = document.getElementById('chatInterface');
+        const profileForm = document.getElementById('profileForm');
+
+        if (result.displayName && result.age) {
+            // Profile exists, show chat interface
+            chatInterface.style.display = 'block';
+            profileForm.style.display = 'none';
+        } else {
+            // Profile doesn't exist, show the form
+            profileForm.style.display = 'block';
+            chatInterface.style.display = 'none';
+        }
+    });
+
+    // Handle form submission
+    const submitButton = document.getElementById('submitProfile');
+    submitButton.addEventListener('click', (event) => {
+        event.preventDefault(); // Prevent default form submission
+
+        const displayName = document.getElementById('displayName').value;
+        const age = document.getElementById('age').value;
+
+        // Basic validation (you can add more)
+        if (displayName && age) {
+            // Save profile data to storage
+            chrome.storage.local.set({ displayName, age }, () => {
+                // Show chat interface
+                profileForm.style.display = 'none';
+                chatInterface.style.display = 'block';
+            });
+        } else {
+            // Handle invalid input (e.g., show an error message)
+            alert('Please enter both your name and age.');
+        }
+    });
+}
+
+// Get the "Clear All Data" button element
+const clearAllDataButton = document.getElementById('clearAllDataButton');
+
+// Add event listener to the "Clear All Data" button
+clearAllDataButton.addEventListener('click', () => {
+    // Show a confirmation dialog
+    const confirmClear = confirm('Are you sure you want to clear all data? This action cannot be undone.');
+    
+    if (confirmClear) {
+        // Clear all data from local storage
+        chrome.storage.local.clear(() => {
+            // Reload the extension popup
+            location.reload();
+        });
+    }
+});

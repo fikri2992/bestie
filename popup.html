@@ -8,50 +8,63 @@
 </head>
 
 <body>
-    <div class="tab-container">
-        <button class="tab active" data-target="chat">Chat</button>
-        <button class="tab" data-target="settings">Settings</button>
-    </div>
+    <div id="profileForm" class="content-container">
+        <div class="form-container">
+            <h2>Welcome to Bestie!</h2>
+            <label for="displayName">Your Name:</label>
+            <input type="text" id="displayName" placeholder="Enter your display name">
 
-    <div class="content-container">
-        <div id="chat" class="content active">
-            <div class="chat-container">
-                <div class="chat-header">
-                    <h2>Bestie <3</h2>
-                </div>
-                <div class="chat-messages">
-                </div>
-                <div class="chat-input">
-                    <div class="input-group">
-                        <input type="text" placeholder="Type your message..." class="input-text">
-                        <label id="attachImageButton" for="imageUpload" class="input-attach">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor" style="width: 1em;" class="size-6">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
+            <label for="age">Your Age:</label>
+            <input type="number" id="age" placeholder="Enter your age">
+
+            <button id="submitProfile">Start Chatting</button>
+        </div>
+    </div>
+    <div id="chatInterface" style="display: none;">
+        <div id="tab-nav" class="tab-container">
+            <button class="tab active" data-target="chat">Chat</button>
+            <button class="tab" data-target="settings">Settings</button>
+        </div>
+
+        <div id="chat-form" class="content-container">
+            <div id="chat" class="content active">
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <h2>Bestie <3</h2> </div> <div class="chat-messages">
+                    </div>
+                    <div class="chat-input">
+                        <div class="input-group">
+                            <input type="text" placeholder="Type your message..." class="input-text">
+                            <label id="attachImageButton" for="imageUpload" class="input-attach">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke-width="1.5" stroke="currentColor" style="width: 1em;" class="size-6">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.112 2.13" />
                                 </svg>
                                 <input type="file" id="imageUpload" accept="image/*" style="display: none;">
-                        </label>
+                            </label>
+                        </div>
+                        <button class="send-button">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                stroke="currentColor" style="width: 1em;" class="size-6">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+                            </svg>
+                        </button>
                     </div>
-                    <button class="send-button">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 1em;"
-                            class="size-6">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
-                        </svg>
-                    </button>
                 </div>
             </div>
-        </div>
-        <div id="settings" class="content">
-            <div class="settings-container"> 
-                <button id="clearChatButton">Clear Chat</button>
-                <div class="setting-item mt-4">
-                    <span>Enable Image Censor</span>
-                    <label class="switch">
-                        <input type="checkbox" id="censorToggle">
-                        <span class="slider"></span>
-                    </label>
+            <div id="settings" class="content">
+                <div class="settings-container">
+                    <button id="clearChatButton">Clear Chat</button>
+                    <div class="setting-item mt-4">
+                        <span>Enable Image Censor</span>
+                        <label class="switch">
+                            <input type="checkbox" id="censorToggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <button id="clearAllDataButton" class="danger-button">Clear All Data</button>
                 </div>
             </div>
         </div>
@@ -61,5 +74,3 @@
 </body>
 
 </html>
-
-
