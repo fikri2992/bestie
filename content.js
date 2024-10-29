@@ -138,7 +138,12 @@ const ImageCensor = (() => {
                 });
             } else if (message.action === "revealImage") {
                 const imageUrl = message.srcUrl;
-                const image = Array.from(document.querySelectorAll(`img[src="${imageUrl}"], div[style*='background-image="${imageUrl}']`)).find(el => el);
+                console.log('Received image URL:', imageUrl);
+                const image = Array.from(document.querySelectorAll(`img[src="${imageUrl}"][data-censored], div[data-censored]`)).find(el => {
+                    const backgroundImage = el.style.backgroundImage;
+                    return backgroundImage.includes(`url("${imageUrl}")`) || backgroundImage.includes(`url('${imageUrl}')`);
+                });
+                
                 if (image) {
                     const baseUrl = getBaseUrl(imageUrl);
                     image.style.filter = "none";
