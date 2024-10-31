@@ -1,3 +1,9 @@
+// background.js
+chrome.runtime.onInstalled.addListener(() => {
+    console.log("NSFWJS Extension installed.");
+});
+
+
 
 chrome.contextMenus.create({
     id: "revealImage",
