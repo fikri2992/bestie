@@ -4,6 +4,7 @@
     "version": "1.0",
     "description": "A simple chat extension",
     "permissions": [
+        "scripting",
         "storage",
         "activeTab",
         "tabs",
@@ -11,9 +12,14 @@
     ],
     "content_scripts": [{
         "matches": ["<all_urls>"],
-        "js": ["content.js"],
+        "js": [ "content.js"],
+        "all_frames": true,
         "run_at": "document_start"
     }],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval' ; object-src 'self';",
+        "sandbox": "sandbox allow-scripts allow-forms allow-popups allow-modals; script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'self';"
+    },
     "background": {
         "service_worker": "background.js"
     }, 

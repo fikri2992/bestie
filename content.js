@@ -2,7 +2,7 @@
 console.log('Content script loaded on', window.location.href);
 
 const ImageCensor = (() => {
-
+    let model = null;
     const defaultState = {
         censorEnabled: true,
         blurIntensity: 40
@@ -52,29 +52,37 @@ const ImageCensor = (() => {
         if (!imageUrl || !isLargeEnough) return element;
 
         // Hide the element initially
-        element.style.visibility = 'hidden';
+        // element.style.visibility = 'hidden';
 
         // Delay showing the blurred image
-        setTimeout(() => {
+        // setTimeout(() => {
             element.dataset.censored = "true";
             element.classList.add("censored-image"); // Add a unique class to the element
             element.style.setProperty("filter", `blur(${state.blurIntensity}px)`, "important");
-            element.style.visibility = 'visible'; // Show the element with the blur applied
-        }, 500); // Adjust the delay (in milliseconds) as needed
+            // element.style.visibility = 'visible'; // Show the element with the blur applied
+        // }, 500); // Adjust the delay (in milliseconds) as needed
 
-        const parentElement = element.parentElement;
-        if (parentElement && window.getComputedStyle(parentElement).position === "static") {
-            parentElement.style.position = "relative";
-        }
+        // const parentElement = element.parentElement;
+        // if (parentElement && window.getComputedStyle(parentElement).position === "static") {
+        //     parentElement.style.position = "relative";
+        // }
 
         return element;
     };
 
     const censorAllImages = state => {
         const images = Array.from(document.querySelectorAll("img, div[style*='background-image']"));
-        images.forEach(blurElement(state));
+        images.forEach(element => {
+            blurElement(state)(element)
+            checkNSFWContent(state, model, [element]);
+        });
     };
-        
+    checkNsfwAllImage = state => {
+        const images = Array.from(document.querySelectorAll("img, div[style*='background-image']"));
+        images.forEach(element => {
+            checkNSFWContent(state, model, [element]);
+        });
+    };   
     const updateRevealedImages = state =>
         new Promise(resolve =>
             chrome.storage.local.set({
@@ -99,7 +107,7 @@ const ImageCensor = (() => {
                             checkNSFWContent(state, model, [node]);
                         }
                         if (node.querySelectorAll) {
-                            const newImages = Array.from(node.querySelectorAll("img, div[style*='background-image']"));
+                            const newImages = Array.from(node.querySelectorAll("div[style*='background-image']"));
                             checkNSFWContent(state, model, newImages);
                         }
                     }, 500); // Adjust delay (in milliseconds) as needed 
@@ -198,7 +206,7 @@ const ImageCensor = (() => {
             const baseUrl = getBaseUrl(imageUrl);
             if (!state.censorEnabled || element.dataset.censored || state.revealedImages[baseUrl]) continue;
 
-            const isLargeEnough = element.offsetWidth >= 128 && element.offsetHeight >= 128;
+            const isLargeEnough = element.offsetWidth >= 128 || element.offsetHeight >= 64;
             if (!imageUrl || !isLargeEnough) continue;
 
             // Blur the image instantly without waiting for NSFWJS
@@ -240,7 +248,10 @@ const ImageCensor = (() => {
     const init = async () => {
         const state = await loadSettings();
         // showLoader(); // Show the loader before censoring
-        censorAllImages(state);
+        const images = Array.from(document.querySelectorAll("img, div[style*='background-image']"));
+        images.forEach(element => {
+            // blurElement(state)(element)
+        });
         setupMessageListener(state);
         const tfScript = document.createElement('script');
         tfScript.src = chrome.runtime.getURL('./js/tf.min.js');
@@ -250,17 +261,15 @@ const ImageCensor = (() => {
             try {
                 const nsfwjsUrl = chrome.runtime.getURL('./js/nsfwjs.min.js');
                 await import(nsfwjsUrl);
-                const model = await nsfwjs.load(chrome.runtime.getURL('models/'), {
+                model = await nsfwjs.load(chrome.runtime.getURL('models/'), {
                     size: 224
                 });
-                if (state.censorEnabled) {
-                    await checkNSFWContent(state, model);
-                }
-                // observeNewImages(state, model);
+                observeNewImages(state, model);
+                censorAllImages(state);
                 // hideLoader(); // Hide the loader after censoring is complete
             } catch (error) {
                 console.error('Error loading NSFWJS:', error);
-                hideLoader(); // Hide the loader in case of an error
+                // hideLoader(); // Hide the loader in case of an error
             }
         };
     };
