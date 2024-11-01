@@ -37,7 +37,7 @@ const ImageCensor = (() => {
     
     const blurElement = state => element => {
         const imageUrl = element.tagName === 'IMG' ? element.src : element.style.backgroundImage.slice(4, -1).replace(/"/g, "");
-        if (element.style.backgroundImage) console.log("imageUrl :", imageUrl)
+        console.log("blurElement called with imageUrl:", imageUrl);
         // Check if imageUrl is a valid URL
         if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:') && !imageUrl.startsWith('blob:')) {
             return element; // Skip processing if not a valid URL
@@ -65,7 +65,6 @@ const ImageCensor = (() => {
 
     const censorAllImages = state => {
         const images = Array.from(document.querySelectorAll("img", "div[style*='background-image']"));
-        console.log("images :", images)
         images.forEach(element => {
             blurElement(state)(element)
             // Start scanning images when the content script runs
@@ -92,58 +91,34 @@ const ImageCensor = (() => {
         });
 
     };
-    
     const observeNewImages = (state) => {
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
-                // Handle added nodes (new elements added to the DOM)
-                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                    mutation.addedNodes.forEach((node) => {
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                            // If the added node is an image
-                            if (node.tagName === 'IMG') {
-                                blurElement(state)(node);
-                                scanImages(node, state);
-                            }
-                            // If the added node has a background image
-                            if (node.style && node.style.backgroundImage) {
-                                blurElement(state)(node);
-                                scanImages(node, state);
-                            }
-                            // Check for images within the added node
-                            const images = node.querySelectorAll('img, div[style*="background-image"]');
-                            images.forEach((img) => {
-                                blurElement(state)(img);
-                                scanImages(img, state);
-                            });
-                        }
-                    });
-                }
-                // Handle attribute changes (e.g., changes to the 'src' attribute of images)
                 if (mutation.type === 'attributes') {
                     const target = mutation.target;
-                    if (mutation.attributeName === 'src' && target.tagName === 'IMG') {
+                    if (
+                        (mutation.attributeName === 'src' && target.tagName === 'IMG') ||
+                        (mutation.attributeName === 'style' && target.style.backgroundImage)
+                    ) {
                         blurElement(state)(target);
-                        scanImages(target, state);
-                    }
-                    if (mutation.attributeName === 'style' && target.style.backgroundImage) {
-                        blurElement(state)(target);
-                        scanImages(target, state);
+                        setTimeout(() => {
+                            scanImages(target, state);
+                        }, 100);
+                        // scanImages(target, state);
                     }
                 }
             });
         });
-    
+
         observer.observe(document.body, {
             childList: true,
             subtree: true,
             attributes: true,
             attributeFilter: ['src', 'style'],
         });
-    
+
         return observer;
     };
-    
     
     const updateEnabledState = newState =>
         new Promise(resolve =>
