@@ -48,7 +48,7 @@ const ImageCensor = (() => {
         if (!state.censorEnabled || element.dataset.censored || state.revealedImages[baseUrl]) return element;
 
         // Check if the element has a background image and is large enough
-        const isLargeEnough = element.offsetWidth >= 128 && element.offsetHeight >= 128;
+        const isLargeEnough = element.offsetWidth >= 128 || element.offsetHeight >= 128;
         if (!imageUrl || !isLargeEnough) return element;
 
         // Hide the element initially
@@ -71,18 +71,16 @@ const ImageCensor = (() => {
     };
 
     const censorAllImages = state => {
+        console.log("Asdasdamasuk sini ")
         const images = Array.from(document.querySelectorAll("img, div[style*='background-image']"));
+        console.log(images)
         images.forEach(element => {
+            // Start scanning images when the content script runs
+            scanImages(element);
+            // checkNSFWContent(state, model, [element]);
             blurElement(state)(element)
-            checkNSFWContent(state, model, [element]);
         });
     };
-    checkNsfwAllImage = state => {
-        const images = Array.from(document.querySelectorAll("img, div[style*='background-image']"));
-        images.forEach(element => {
-            checkNSFWContent(state, model, [element]);
-        });
-    };   
     const updateRevealedImages = state =>
         new Promise(resolve =>
             chrome.storage.local.set({
@@ -97,31 +95,31 @@ const ImageCensor = (() => {
         });
     };
 
-    const observeNewImages = (state, model) => {
-        const observer = new MutationObserver(mutations => {
-            mutations.forEach(mutation => {
-                mutation.addedNodes.forEach(node => {
-                    // Delay the check for new images
-                    setTimeout(() => {
-                        if (node.tagName === "IMG") {
-                            checkNSFWContent(state, model, [node]);
-                        }
-                        if (node.querySelectorAll) {
-                            const newImages = Array.from(node.querySelectorAll("div[style*='background-image']"));
-                            checkNSFWContent(state, model, newImages);
-                        }
-                    }, 500); // Adjust delay (in milliseconds) as needed 
-                });
-            });
-        });
+    // const observeNewImages = (state, model) => {
+    //     const observer = new MutationObserver(mutations => {
+    //         mutations.forEach(mutation => {
+    //             mutation.addedNodes.forEach(node => {
+    //                 // Delay the check for new images
+    //                 setTimeout(() => {
+    //                     if (node.tagName === "IMG") {
+    //                         checkNSFWContent(state, model, [node]);
+    //                     }
+    //                     if (node.querySelectorAll) {
+    //                         const newImages = Array.from(node.querySelectorAll("div[style*='background-image']"));
+    //                         checkNSFWContent(state, model, newImages);
+    //                     }
+    //                 }, 500); // Adjust delay (in milliseconds) as needed 
+    //             });
+    //         });
+    //     });
 
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
+    //     observer.observe(document.body, {
+    //         childList: true,
+    //         subtree: true
+    //     });
 
-        return observer;
-    };
+    //     return observer;
+    // };
 
     const updateEnabledState = newState =>
         new Promise(resolve =>
@@ -239,39 +237,86 @@ const ImageCensor = (() => {
                 // Add NSFW label if the probability is above the threshold
                 if (nsfwProbability > 0.7) {
                     addNSFWLabel(element, nsfwProbability);
+                } else {
+                    console.log("Asdasdas", element, nsfwProbability)
+                    addNSFWLabel(element, nsfwProbability);
+                    // uncensorImage(state, imageUrl);
                 }
             } catch (error) {
                 console.error('Error classifying image:', error);
             }
         }
     };
-    const init = async () => {
-        const state = await loadSettings();
-        // showLoader(); // Show the loader before censoring
-        const images = Array.from(document.querySelectorAll("img, div[style*='background-image']"));
-        images.forEach(element => {
-            // blurElement(state)(element)
-        });
-        setupMessageListener(state);
-        const tfScript = document.createElement('script');
-        tfScript.src = chrome.runtime.getURL('./js/tf.min.js');
-        document.head.appendChild(tfScript);
+    // content.js
 
-        tfScript.onload = async () => {
-            try {
-                const nsfwjsUrl = chrome.runtime.getURL('./js/nsfwjs.min.js');
-                await import(nsfwjsUrl);
-                model = await nsfwjs.load(chrome.runtime.getURL('models/'), {
-                    size: 224
-                });
-                observeNewImages(state, model);
-                censorAllImages(state);
-                // hideLoader(); // Hide the loader after censoring is complete
-            } catch (error) {
-                console.error('Error loading NSFWJS:', error);
-                // hideLoader(); // Hide the loader in case of an error
+    // Function to scan images on the page
+    function scanImages(img) {
+        // for (const img of images) {
+            // Mark image as scanned
+            img.dataset.nsfwScanned = 'true';
+            // Wait for the image to load
+            if (img.complete && img.naturalHeight !== 0) {
+                analyzeImage(img);
+            } else {
+                // img.onload = () => analyzeImage(img);
             }
-        };
+        // }
+    }
+
+    // Function to request image analysis
+    function analyzeImage(img) {
+        const imageUrl = img.src;
+
+        // Send message to background script to analyze the image
+        chrome.runtime.sendMessage({
+                type: 'ANALYZE_IMAGE',
+                imageUrl: imageUrl
+            },
+            (response) => {
+                console.log(response)
+                if (response.type === 'ANALYSIS_RESULT') {
+                    handleAnalysisResult(img, response.result);
+                    console.log(response)
+                } else if (response.type === 'ANALYSIS_ERROR') {
+                    console.error('Analysis error:', response.error);
+                }
+            }
+        );
+    }
+
+    // Function to handle the analysis result
+    function handleAnalysisResult(img, result) {
+        // Check if the image is classified as NSFW
+        const nsfwScore = result.find((prediction) => prediction.className === 'Pornography').probability;
+        console.log("nsfwScore", nsfwScore)
+        if (nsfwScore > 0.7) {
+            // Blur the image or replace it
+            img.style.filter = 'blur(10px)';
+            img.title = 'NSFW content detected';
+        }
+    }
+
+    const init = async () => {
+        try {
+            const state = await loadSettings();
+            
+            censorAllImages(state);
+            setupMessageListener(state);
+            // observeNewImages(state, model);
+            // chrome.runtime.sendMessage({
+            //     type: 'modelLoaded',
+            // }, (response) => {
+            //     console.log(response)
+            //     if (response?.type === 'Model_Loaded') {
+            //         console.log(response.result)
+            //     } else if (response?.type === 'ANALYSIS_ERROR') {
+            //         console.error('Analysis error:', response.error);
+            //     }
+            // }
+        // );
+        } catch (error) {
+            console.error('Error loading NSFWJS:', error);
+        }
     };
 
     return {
@@ -281,26 +326,4 @@ const ImageCensor = (() => {
 
 ImageCensor.init();
 
-const showLoader = () => {
-    const loader = document.createElement('div');
-    loader.id = 'censor-loader';
-    loader.style.position = 'fixed';
-    loader.style.top = '0';
-    loader.style.left = '0';
-    loader.style.width = '100%';
-    loader.style.height = '100%';
-    loader.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-    loader.style.zIndex = '9999';
-    loader.style.display = 'flex';
-    loader.style.justifyContent = 'center';
-    loader.style.alignItems = 'center';
-    loader.innerHTML = '<div style="font-size: 24px; font-weight: bold;">Loading...</div>';
-    document.body.appendChild(loader);
-};
 
-const hideLoader = () => {
-    const loader = document.getElementById('censor-loader');
-    if (loader) {
-        loader.remove();
-    }
-};

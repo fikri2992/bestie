@@ -4,6 +4,7 @@
     "version": "1.0",
     "description": "A simple chat extension",
     "permissions": [
+        "offscreen",
         "scripting",
         "storage",
         "activeTab",
@@ -27,7 +28,7 @@
         "resources": ["icons/*", "models/*", "js/*"],
         "matches": ["<all_urls>"]
     }],
-    "host_permissions": ["http://localhost:3000/*"],
+    "host_permissions": ["<all_urls>"],
     "action": {
         "default_popup": "popup.html"
     }
