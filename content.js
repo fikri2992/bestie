@@ -2,7 +2,6 @@
 console.log('Content script loaded on', window.location.href);
 
 const ImageCensor = (() => {
-    let model = null;
     const defaultState = {
         censorEnabled: true,
         blurIntensity: 40
@@ -38,6 +37,7 @@ const ImageCensor = (() => {
     
     const blurElement = state => element => {
         const imageUrl = element.tagName === 'IMG' ? element.src : element.style.backgroundImage.slice(4, -1).replace(/"/g, "");
+        if (element.style.backgroundImage) console.log("imageUrl :", imageUrl)
         // Check if imageUrl is a valid URL
         if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:') && !imageUrl.startsWith('blob:')) {
             return element; // Skip processing if not a valid URL
@@ -85,38 +85,50 @@ const ImageCensor = (() => {
             element.style.filter = "none";
             delete element.dataset.censored;
         });
-    };
+        //also remove all label with class bestie-nsfw-label
+        const labels = Array.from(document.querySelectorAll(".bestie-nsfw-label"));
+        labels.forEach(label => {
+            label.remove()
+        });
 
+    };
+    
     const observeNewImages = (state) => {
-        const observer = new MutationObserver(mutations => {
-            mutations.forEach(mutation => {
-                if (mutation.type === 'childList') {
-                    mutation.addedNodes.forEach(node => {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                // Handle added nodes (new elements added to the DOM)
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    mutation.addedNodes.forEach((node) => {
                         if (node.nodeType === Node.ELEMENT_NODE) {
-                            if (node.tagName === "IMG") {
-                                console.log("New <img> element detected:", node);
-                                if (!node.dataset.censored) {
-                                    scanImages(node, state);
-                                    blurElement(state)(node);
-                                }
+                            // If the added node is an image
+                            if (node.tagName === 'IMG') {
+                                blurElement(state)(node);
+                                scanImages(node, state);
                             }
-                            if (node.querySelectorAll) {
-                                const newImages = Array.from(node.querySelectorAll("div[style*='background-image']"));
-                                newImages.forEach(element => {
-                                    if (!element.dataset.censored) {
-                                        scanImages(element, state);
-                                        blurElement(state)(element);
-                                    }
-                                });
+                            // If the added node has a background image
+                            if (node.style && node.style.backgroundImage) {
+                                blurElement(state)(node);
+                                scanImages(node, state);
                             }
+                            // Check for images within the added node
+                            const images = node.querySelectorAll('img, div[style*="background-image"]');
+                            images.forEach((img) => {
+                                blurElement(state)(img);
+                                scanImages(img, state);
+                            });
                         }
                     });
-                } else if (mutation.type === 'attributes' && mutation.attributeName === 'src') {
-                    const imgElement = mutation.target;
-                    if (imgElement.tagName === "IMG" && !imgElement.dataset.censored) {
-                        console.log("Image src changed:", imgElement);
-                        scanImages(imgElement, state);
-                        blurElement(state)(imgElement);
+                }
+                // Handle attribute changes (e.g., changes to the 'src' attribute of images)
+                if (mutation.type === 'attributes') {
+                    const target = mutation.target;
+                    if (mutation.attributeName === 'src' && target.tagName === 'IMG') {
+                        blurElement(state)(target);
+                        scanImages(target, state);
+                    }
+                    if (mutation.attributeName === 'style' && target.style.backgroundImage) {
+                        blurElement(state)(target);
+                        scanImages(target, state);
                     }
                 }
             });
@@ -126,11 +138,12 @@ const ImageCensor = (() => {
             childList: true,
             subtree: true,
             attributes: true,
-            attributeFilter: ['src']
+            attributeFilter: ['src', 'style'],
         });
     
         return observer;
     };
+    
     
     const updateEnabledState = newState =>
         new Promise(resolve =>
@@ -183,6 +196,8 @@ const ImageCensor = (() => {
 
     const addNSFWLabel = (element, probability) => {
         const label = document.createElement('div');
+        // add specific class to the label
+        label.classList.add('bestie-nsfw-label');
         label.textContent = `NSFW (${(probability * 100).toFixed(2)}%)`;
         label.style.position = 'absolute';
         label.style.top = '0';
@@ -192,7 +207,9 @@ const ImageCensor = (() => {
         label.style.padding = '4px';
         label.style.fontSize = '14px';
         label.style.fontWeight = 'bold';
-        label.style.zIndex = '1000';
+        label.style.zIndex = '1000';    
+        label.style.isolation = 'isolate'; // Add isolation property
+
 
         const parentElement = element.parentElement;
         if (parentElement && window.getComputedStyle(parentElement).position === "static") {
@@ -212,13 +229,11 @@ const ImageCensor = (() => {
     // Function to request image analysis
     function analyzeImage(img, state) {
         const imageUrl = img.src;
-
+        const isLargeEnough = img.offsetWidth >= 128 || img.offsetHeight >= 128;
+        if (!isLargeEnough) return img;
+        blurElement(state)(img);
         // Send message to background script to analyze the image
-        chrome.runtime.sendMessage({
-                type: 'ANALYZE_IMAGE',
-                imageUrl: imageUrl
-            },
-            (response) => {
+        chrome.runtime.sendMessage({ type: 'ANALYZE_IMAGE', imageUrl: imageUrl }, (response) => {
                 if (response.type === 'ANALYSIS_RESULT') {
                     handleAnalysisResult(img, response.result, state);
                 } else if (response.type === 'ANALYSIS_ERROR') {
@@ -230,8 +245,8 @@ const ImageCensor = (() => {
 
     // Function to handle the analysis result
     function handleAnalysisResult(img, result, state) {
-        blurElement(state)(img);
         // Check if the image is classified as NSFW
+        
         const nsfwProbability = result.find(
             (pred) => pred.className === 'Porn' || pred.className === 'Hentai'
         )?.probability;
@@ -239,8 +254,7 @@ const ImageCensor = (() => {
             (pred) => pred.className === 'Neutral'
         )?.probability;
         // Add NSFW label if the probability is above the threshold
-        const isLargeEnough = img.offsetWidth >= 128 || img.offsetHeight >= 128;
-        if (!isLargeEnough) return img;
+        
         if (nsfwProbability > 0.7) {
             // addNSFWLabel(img, nsfwProbability);
         } 
@@ -254,8 +268,8 @@ const ImageCensor = (() => {
         try {
             const state = await loadSettings();
             setupMessageListener(state);
-            observeNewImages(state);
-            censorAllImages(state);
+            censorAllImages(state);// instantly censor all images
+            observeNewImages(state);// gradually censor new images
         } catch (error) {
             console.error('Error loading NSFWJS:', error);
         }

@@ -26,7 +26,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     if (message.type === 'ANALYZE_IMAGE') {
         const imageUrl = message.imageUrl;
-        console.log("Analyzing image...");
+        console.log("Analyzing image...", imageUrl);
         analyzeImage(imageUrl)
             .then((predictions) => {
                 // Handle the classification predictions
