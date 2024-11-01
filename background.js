@@ -1,6 +1,14 @@
 // background.js
 chrome.runtime.onInstalled.addListener(() => {
     console.log("NSFWJS Extension installed.");
+    ensureOffscreenDocument().then(() => {
+        // Forward the message to the offscreen document
+        loadModelInOffscreen();
+        // chrome.runtime.sendMessage(message, async (response) => {
+        //     // Send the response back to the content script
+        //     await sendResponse(response);
+        // });
+    });
 });
 
 chrome.contextMenus.create({
@@ -33,31 +41,17 @@ async function ensureOffscreenDocument() {
 // Listen for messages from the content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'ANALYZE_IMAGE') {
-        // Ensure the offscreen document is available
-        ensureOffscreenDocument().then(() => {
-            // Forward the message to the offscreen document
-            chrome.runtime.sendMessage(message, async (response) => {
-                // Send the response back to the content script
-                console.log("masuk sini gan", message, response)
-                await sendResponse(response);
-            });
-        });
-
-        // Return true to indicate async response
-        return true;
-    }
-
-    if (message.type === 'modelLoaded') {
-        // Ensure the offscreen document is available
-        ensureOffscreenDocument().then(() => {
-            // Forward the message to the offscreen document
-            chrome.runtime.sendMessage(message, async (response) => {
-                // Send the response back to the content script
-                await sendResponse(response);
-            });
+        // Forward the message to the offscreen document
+        chrome.runtime.sendMessage(message, async (response) => {
+            // Send the response back to the content script
+            await sendResponse(response);
         });
 
         // Return true to indicate async response
         return true;
     }
 });
+
+function loadModelInOffscreen() {
+    chrome.runtime.sendMessage({ type: 'LOAD_MODEL' });
+}
