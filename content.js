@@ -6,7 +6,13 @@ const ImageCensor = (() => {
         censorEnabled: true,
         blurIntensity: 40
     };
-
+    const classNameMap = {
+        'Drawing': 'Drawing',
+        'Hentai': 'Hentai',
+        'Neutral': 'Neutral',
+        'Porn': 'Porn',
+        'Sexy': 'Sexy'
+    };
     const loadSettings = () =>
         new Promise(resolve =>
             chrome.storage.local.get(["censorEnabled", "blurIntensity", "revealedImages"], result =>
@@ -36,31 +42,30 @@ const ImageCensor = (() => {
     };
     
     const blurElement = state => element => {
-        const imageUrl = element.tagName === 'IMG' ? element.src : element.style.backgroundImage.slice(4, -1).replace(/"/g, "");
+        const imageUrl = element.tagName === 'IMG' ? element.src || element.srcset.split(' ')[0] : element.style.backgroundImage.slice(4, -1).replace(/"/g, "");
         // console.log("blurElement called with imageUrl:", imageUrl);
-        if (imageUrl.includes('https://pbs.twimg.com/media/GbUxo4haUAApfGz')) console.log(element)
         // Check if imageUrl is a valid URL
         if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:') && !imageUrl.startsWith('blob:')) {
             return element; // Skip processing if not a valid URL
         }
-    
+
         const baseUrl = getBaseUrl(imageUrl);
-        if (!state.censorEnabled || element.dataset.censored || state.revealedImages[baseUrl]) return element;
-    
-        // Check if the element has a background image and is large enough
+        if (!state.censorEnabled || element.dataset.censored) return element;
+        console.log("blurElement called with baseUrl:", baseUrl);
+        // // Check if the element has a background image and is large enough
         const isLargeEnough = element.offsetWidth >= 60 || element.offsetHeight >= 60;
         if (!imageUrl || !isLargeEnough) return element;
-    
-        // Check if the element already has a blur filter with 40px and !important
+
+        // // Check if the element already has a blur filter with 40px and !important
         const currentFilter = element.style.getPropertyValue('filter');
         if (currentFilter && currentFilter.includes(`blur(${state.blurIntensity}px)`) && currentFilter.includes('!important')) {
             return element; // Skip blurring if the element already has the desired blur filter
         }
-    
+
         element.dataset.censored = "true";
         element.classList.add("censored-image"); // Add a unique class to the element
         element.style.setProperty("filter", `blur(${state.blurIntensity}px)`, "important");
-    
+
         return element;
     };
 
@@ -107,16 +112,20 @@ const ImageCensor = (() => {
                         setTimeout(() => {
                             scanImages(target, state);
                         }, 100);
-                        // scanImages(target, state);
                     }
                 }
                 if (mutation.type === 'childList') {
                     mutation.addedNodes.forEach((node) => {
                         if (node.nodeType === Node.ELEMENT_NODE) {
+                            if (node.tagName === 'IMG' || node.tagName === 'DIV') {
+                                blurElement(state)(node);
+                                setTimeout(() => {
+                                    scanImages(node, state);
+                                }, 100);
+                            }
                             const images = node.querySelectorAll('img, div[style*="background-image"]');
                             images.forEach((img) => {
                                 blurElement(state)(img);
-                                // if (img.tagName !== 'IMG') console.log('ini div', img)
                                 setTimeout(() => {
                                     scanImages(img, state);
                                 }, 100);
@@ -127,12 +136,17 @@ const ImageCensor = (() => {
             });
         });
 
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['src', 'style'],
-        });
+        if (document.body) {
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['src', 'srcset', 'style'],
+            });
+        } else {
+            console.warn('Document body not found. Retrying in 100ms...');
+            setTimeout(() => observeNewImages(state), 100);
+        }
 
         return observer;
     };
@@ -144,23 +158,27 @@ const ImageCensor = (() => {
                 blurIntensity: newState.blurIntensity
             }, () => resolve(newState))
         );
-    const uncensorImage = (state, imageUrl) => {
-        const image = Array.from(document.querySelectorAll(`img[src="${imageUrl}"][data-censored], div[data-censored]`)).find(el => {
-            if (el.tagName === 'IMG') {
-                return el; // Return the element if it's an img
-            }
-            const backgroundImage = el.style.backgroundImage;
-            return backgroundImage.includes(`url("${imageUrl}")`) || backgroundImage.includes(`url('${imageUrl}')`);
-        });
 
-        if (image) {
-            const baseUrl = getBaseUrl(imageUrl);
-            image.style.filter = "none";
-            state.revealedImages[baseUrl] = true;
-            updateRevealedImages(state);
-            delete image.dataset.censored;
-        }
+    const uncensorImage = (state, imageUrl) => {
+        const elements = Array.from(document.querySelectorAll(`img[src="${imageUrl}"][data-censored], div[data-censored]`));
+        
+        elements.forEach(el => {
+            if (el.tagName === 'IMG' && el.src === imageUrl) {
+                el.style.filter = "none";
+                delete el.dataset.censored;
+            } else if (el.tagName === 'DIV') {
+                const backgroundImage = el.style.backgroundImage;
+                if (backgroundImage.includes(`url("${imageUrl}")`) || backgroundImage.includes(`url('${imageUrl}')`)) {
+                    el.style.filter = "none";
+                    delete el.dataset.censored;
+                }
+            }
+        });
+        const baseUrl = getBaseUrl(imageUrl);
+        state.revealedImages[baseUrl] = true;
+        updateRevealedImages(state);
     };
+        
 
     const setupMessageListener = state => {
         chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
@@ -186,100 +204,114 @@ const ImageCensor = (() => {
         });
     };
 
-    const addNSFWLabel = (element, probability) => {
+    function getHighestProbabilityClass(probabilities) {
+        return Object.entries(probabilities).reduce((maxClass, [className, probability]) => {
+            if (probability > maxClass.probability) {
+                return { className, probability };
+            }
+            return maxClass;
+        }, { className: null, probability: 0 });
+    }
+    
+    function createLabel(className, probability, originalClassName = null) {
         const label = document.createElement('div');
-        // add specific class to the label
-        label.classList.add('bestie-nsfw-label');
-        label.textContent = `NSFW (${(probability * 100).toFixed(2)}%)`;
+        label.classList.add('bestie-label', `bestie-${className.toLowerCase()}-label`);
+        
+        if (originalClassName) {
+            label.textContent = `Unrecognized (${classNameMap[originalClassName]}: ${(probability * 100).toFixed(2)}%)`;
+        } else {
+            label.textContent = `${classNameMap[className]} (${(probability * 100).toFixed(2)}%)`;
+        }
+        
         label.style.position = 'absolute';
         label.style.top = '0';
         label.style.left = '0';
-        label.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
         label.style.color = 'white';
         label.style.padding = '4px';
         label.style.fontSize = '14px';
         label.style.fontWeight = 'bold';
-        label.style.zIndex = '1000';    
-        label.style.isolation = 'isolate'; // Add isolation property
-
-
-        const parentElement = element.parentElement;
+        label.style.zIndex = '100';
+        label.style.isolation = 'isolate';
+    
+        if (className === 'Neutral') {
+            label.style.backgroundColor = 'rgba(0, 255, 0, 0.7)';
+            label.style.color = 'black';
+        } else if (className === 'Unrecognized') {
+            label.style.backgroundColor = 'rgba(255, 165, 0, 0.7)';
+        } else {
+            label.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+        }
+        
+        return label;
+    }
+    
+    function removeExistingLabels(parentElement) {
+        const existingLabels = parentElement.querySelectorAll('.bestie-label');
+        existingLabels.forEach(label => label.remove());
+    }
+    
+    function appendLabels(parentElement, labels) {
         if (parentElement && window.getComputedStyle(parentElement).position === "static") {
             parentElement.style.position = "relative";
         }
-
-        parentElement.appendChild(label);
-    };
-    const addSFWLabel = (element, probability) => {
-        const label = document.createElement('div');
-        // add specific class to the label
-        label.classList.add('bestie-sfw-label');
-        label.textContent = `SFW (${(probability * 100).toFixed(2)}%)`;
-        label.style.position = 'absolute';
-        label.style.top = '0';
-        label.style.left = '0';
-        label.style.backgroundColor = 'rgba(0, 255, 0, 0.7)';
-        label.style.color = 'black';
-        label.style.padding = '4px';
-        label.style.fontSize = '14px';
-        label.style.fontWeight = 'bold';
-        label.style.zIndex = '1000';    
-        label.style.isolation = 'isolate'; // Add isolation property
-
-
-        const parentElement = element.parentElement;
-        if (parentElement && window.getComputedStyle(parentElement).position === "static") {
-            parentElement.style.position = "relative";
-        }
-
-        parentElement.appendChild(label);
-    };
+    
+        labels.forEach(label => parentElement.appendChild(label));
+    }
+    
     // Function to scan images on the page
     function scanImages(img, state) {
         if (img.complete && img.naturalHeight !== 0) {
-            analyzeImage(img, state);
+            const imageUrl = img.src || img.srcset.split(' ')[0];
+            analyzeImage(img, state, imageUrl);
         } 
     }
-
     // Function to request image analysis
-    function analyzeImage(img, state) {
-        const imageUrl = img.src;
+    function analyzeImage(img, state, imageUrl) {
         const isLargeEnough = img.offsetWidth >= 60 || img.offsetHeight >= 60;
         if (!isLargeEnough) return img;
-        blurElement(state)(img);
-        // Send message to background script to analyze the image
-        chrome.runtime.sendMessage({ type: 'ANALYZE_IMAGE', imageUrl: imageUrl }, (response) => {
-                if (response.type === 'ANALYSIS_RESULT') {
-                    handleAnalysisResult(img, response.result, state);
-                } else if (response.type === 'ANALYSIS_ERROR') {
-                    console.error('Analysis error:', response.error);
+        if (state.censorEnabled) {
+            // Send message to background script to analyze the image
+            chrome.runtime.sendMessage({ type: 'ANALYZE_IMAGE', imageUrl: imageUrl }, (response) => {
+                    if (response.type === 'ANALYSIS_RESULT') {
+                        handleAnalysisResult(img, response.result, state);
+                    } else if (response.type === 'ANALYSIS_ERROR') {
+                        console.error('Analysis error:', response.error);
+                    }
                 }
-            }
-        );
+            );
+        }
     }
 
     // Function to handle the analysis result
-    function handleAnalysisResult(img, result, state) {
-        // Check if the image is classified as NSFW
-        
-        const nsfwProbability = result.find(
-            (pred) => pred.className === 'Porn' || pred.className === 'Hentai'
-        )?.probability;
-        const sfwProbability = result.find(
-            (pred) => pred.className === 'Neutral'
-        )?.probability;
-        // Add NSFW label if the probability is above the threshold
-        if (nsfwProbability <= 0.7) console.log('NSFW Probability:', nsfwProbability, 'SFW Probability:', sfwProbability);
-        if (nsfwProbability > 0.6 && sfwProbability < 0.8) {
-        } 
-        
-        addNSFWLabel(img, nsfwProbability);
-        if (sfwProbability > 0.8){
-            // uncensorImage(state, img.src);
-            addSFWLabel(img, sfwProbability);
+    function handleAnalysisResult(element, result, state) {
+        const probabilities = result.reduce((acc, pred) => {
+            acc[pred.className] = pred.probability;
+            return acc;
+        }, {});
+    
+        const highestProbabilityClass = getHighestProbabilityClass(probabilities);
+        const labels = [];
+    
+        if (highestProbabilityClass.probability > 0.6) {
+            const { className, probability } = highestProbabilityClass;
+            const label = createLabel(className, probability);
+            labels.push(label);
+        } else {
+            const { className, probability } = highestProbabilityClass;
+            const label = createLabel('Unrecognized', probability, className);
+            labels.push(label);
         }
-        
+    
+        const parentElement = element.parentElement;
+        removeExistingLabels(parentElement);
+        appendLabels(parentElement, labels);
+    
+        if (probabilities['Neutral'] > 0.8) {
+            // uncensorImage(state, element.src);
+        }
     }
+    
+    
 
     const init = async () => {
         try {
