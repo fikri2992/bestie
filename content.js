@@ -2,6 +2,10 @@
 console.log('Content script loaded on', window.location.href);
 
 const ImageCensor = (() => {
+    let observersEnabled = false;
+    let mutationObserver = null;
+    let intersectionObserver = null;
+
     const defaultState = {
         censorEnabled: true,
         blurIntensity: 40
@@ -40,103 +44,126 @@ const ImageCensor = (() => {
             return null;
         }
     };
-
     const blurElement = state => element => {
         let imageUrl = '';
+        
         if (element.tagName === 'IMG') {
             if (element.srcset) {
                 const srcset = element.srcset.split(',');
                 const sizes = element.sizes.split(',');
                 const windowWidth = window.innerWidth;
-
+    
                 let maxWidth = 0;
                 let maxWidthUrl = '';
-
+    
                 srcset.forEach((src, index) => {
                     const [url, width] = src.trim().split(' ');
                     const widthValue = parseInt(width);
-
+    
                     if (widthValue > maxWidth && widthValue <= windowWidth) {
                         maxWidth = widthValue;
                         maxWidthUrl = url;
                     }
                 });
-
+    
                 imageUrl = maxWidthUrl || element.src;
             } else {
                 imageUrl = element.src;
             }
-        } else {
-            imageUrl = element.style.backgroundImage.slice(4, -1).replace(/"/g, "");
+        } else if (element.tagName === 'DIV') {
+            const backgroundImage = element.style.backgroundImage;
+            if (backgroundImage && backgroundImage.startsWith('url("')) {
+                imageUrl = backgroundImage.slice(5, -2); // Extract URL from url("...")
+            }
         }
-
+        const baseUrl = getBaseUrl(imageUrl);
+        // Check if the imageUrl matches the desired URL
         if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:') && !imageUrl.startsWith('blob:')) {
             return element;
         }
-
-        const baseUrl = getBaseUrl(imageUrl);
-
-        console.log("blurElement called with baseUrl:", baseUrl, state.revealedImages[baseUrl], !state.censorEnabled || state.revealedImages[baseUrl] || element.dataset.censored);
+    
         if (!state.censorEnabled || state.revealedImages[baseUrl] || element.dataset.censored) return element; // Skip if already revealed
-
+    
         const isLargeEnough = element.offsetWidth >= 60 || element.offsetHeight >= 60;
         if (!imageUrl || !isLargeEnough) return element;
-
+    
         const currentFilter = element.style.getPropertyValue('filter');
         if (currentFilter && currentFilter.includes(`blur(${state.blurIntensity}px)`) && currentFilter.includes('!important')) {
             return element;
         }
-
+    
         element.dataset.censored = "true";
         element.classList.add("censored-image");
         element.style.setProperty("filter", `blur(${state.blurIntensity}px)`, "important");
-
+    
         return element;
     };
+    
     const censorAllImages = state => {
-        const images = Array.from(document.querySelectorAll("img", "div[style*='background-image']"));
+        const images = Array.from(document.querySelectorAll("img, div[style*='background-image']"));
         images.forEach(element => {
-            blurElement(state)(element)
-            // Start scanning images when the content script runs
+            blurElement(state)(element);
             setTimeout(() => {
                 scanImages(element, state);
             }, 100);
         });
     };
+
     const updateRevealedImages = state =>
         new Promise(resolve =>
             chrome.storage.local.set({
                 revealedImages: state.revealedImages
             }, () => resolve(state))
-    );
+        );
 
-    const removeAllCensors = () => {
-        const elements = Array.from(document.querySelectorAll("[data-censored]"));
+    const removeAllCensors = (state) => {
+        const elements = Array.from(document.querySelectorAll("[data-censored], .bestie-label"));
         elements.forEach(element => {
-            uncensorImage(state, element.src);
-        });
-        //also remove all label with class bestie-nsfw-l;abel
-        const labels = Array.from(document.querySelectorAll(".bestie-label"));
-        labels.forEach(label => {
-            label.remove()
+            let imageUrl = '';
+            if (element.tagName === 'IMG') {
+                imageUrl = element.src;
+            } else if (element.tagName === 'DIV') {
+                const backgroundImage = element.style.backgroundImage;
+                if (backgroundImage && backgroundImage.startsWith('url("')) {
+                    imageUrl = backgroundImage.slice(5, -2); // Extract URL from url("...")
+                }
+            }
+
+            // const baseUrl = getBaseUrl(imageUrl);
+            // if (baseUrl) {
+            //     state.revealedImages[baseUrl] = true; // Store based on baseUrl
+            // }
+
+            if (element.hasAttribute("data-censored")) {
+                if (element.tagName === 'IMG') {
+                    element.style.filter = "none";
+                } else if (element.tagName === 'DIV') {
+                    element.style.removeProperty('filter');
+                }
+                element.classList.remove("censored-image");
+                delete element.dataset.censored;
+            } else {
+                element.remove();
+            }
         });
     };
+
+
     const uncensorImage = (state, imageUrl) => {
         const baseUrl = getBaseUrl(imageUrl);
         state.revealedImages[baseUrl] = true; // Store based on baseUrl
 
         const elements = Array.from(document.querySelectorAll(`img[src*="${baseUrl}"][data-censored], div[data-censored]`)); // Select elements with baseUrl in src
-
         elements.forEach(el => {
             const elBaseUrl = getBaseUrl(el.tagName === 'IMG' ? el.src : el.style.backgroundImage.slice(4, -1).replace(/"/g, ""));
             if (elBaseUrl && elBaseUrl.includes(baseUrl)) { // Check if element's baseUrl matches the revealed baseUrl
                 el.style.filter = "none";
+                el.classList.remove("censored-image");
                 delete el.dataset.censored;
             }
         });
-
-        // updateRevealedImages(state);
     };
+
     const uncensorWithRevealImage = (state, imageUrl) => {
         const baseUrl = getBaseUrl(imageUrl);
         state.revealedImages[baseUrl] = true; // Store based on baseUrl
@@ -153,8 +180,14 @@ const ImageCensor = (() => {
 
         updateRevealedImages(state);
     };
+
     const observeNewImages = (state) => {
-        const observer = new MutationObserver((mutations) => {
+        if (observersEnabled) {
+            console.warn('observeNewImages is already enabled. Skipping initialization.');
+            return;
+        }
+
+        mutationObserver = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.type === 'attributes') {
                     const target = mutation.target;
@@ -175,7 +208,7 @@ const ImageCensor = (() => {
         });
 
         // Intersection Observer for lazy-loaded images
-        const intersectionObserver = new IntersectionObserver((entries, observer) => {
+        intersectionObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     const img = entry.target;
@@ -213,22 +246,31 @@ const ImageCensor = (() => {
         }
 
         if (document.body) {
-            observer.observe(document.body, {
+            mutationObserver.observe(document.body, {
                 childList: true,
                 subtree: true,
                 attributes: true,
                 attributeFilter: ['src', 'srcset', 'style'],
             });
+            observersEnabled = true;
         } else {
             console.warn('Document body not found. Retrying in 100ms...');
             setTimeout(() => observeNewImages(state), 100);
         }
-
-        return {
-            mutationObserver: observer,
-            intersectionObserver
-        };
     };
+
+    const disableObservers = () => {
+        if (mutationObserver) {
+            mutationObserver.disconnect();
+            mutationObserver = null;
+        }
+        if (intersectionObserver) {
+            intersectionObserver.disconnect();
+            intersectionObserver = null;
+        }
+        observersEnabled = false;
+    };
+
     const updateEnabledState = newState =>
         new Promise(resolve =>
             chrome.storage.local.set({
@@ -245,15 +287,18 @@ const ImageCensor = (() => {
                     ...state,
                     censorEnabled: true
                 };
-                updateEnabledState(newState).then(() => censorAllImages(newState));
+                updateEnabledState(newState).then(() => {
+                    censorAllImages(newState);
+                    observeNewImages(newState); // Enable observers when censoring is enabled
+                });
             } else if (message.action === 'disableCensor') {
                 const newState = {
                     ...state,
                     censorEnabled: false,
-                    revealedImages: {} // Clear revealed images
                 };
                 updateEnabledState(newState).then(() => {
                     removeAllCensors(newState); // Remove censor from all images
+                    disableObservers(); // Disable observers when censoring is disabled
                 });
             } else if (message.action === "revealImage") {
                 uncensorWithRevealImage(state, message.srcUrl);
@@ -393,8 +438,10 @@ const ImageCensor = (() => {
                 return; // Exit the init function without censoring
             }
 
-            censorAllImages(state); // instantly censor all images
-            observeNewImages(state); // gradually censor new images
+            if (state.censorEnabled) {
+                censorAllImages(state); // instantly censor all images
+                observeNewImages(state); // gradually censor new images
+            }
         } catch (error) {
             console.error('Error loading NSFWJS:', error);
         }
