@@ -322,3 +322,31 @@ clearAllDataButton.addEventListener('click', () => {
         });
     }
 });
+
+// ... existing code ...
+
+// Function to save allowlist
+function saveAllowlist() {
+    const allowlistTextarea = document.getElementById('allowlistTextarea');
+    const allowlist = allowlistTextarea.value.split('\n').map(url => url.trim()).filter(url => url !== '');
+    chrome.storage.local.set({ allowlist }, () => {
+        console.log('Allowlist saved');
+    });
+}
+
+// Function to load allowlist
+function loadAllowlist() {
+    chrome.storage.local.get(['allowlist'], (result) => {
+        const allowlistTextarea = document.getElementById('allowlistTextarea');
+        allowlistTextarea.value = result.allowlist ? result.allowlist.join('\n') : '';
+    });
+}
+
+// Event listener for saving allowlist
+const saveAllowlistButton = document.getElementById('saveAllowlistButton');
+saveAllowlistButton.addEventListener('click', saveAllowlist);
+
+// Load allowlist when popup is opened
+document.addEventListener('DOMContentLoaded', loadAllowlist);
+
+// ... existing code ...
