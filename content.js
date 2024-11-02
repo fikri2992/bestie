@@ -76,9 +76,9 @@ const ImageCensor = (() => {
 
         const baseUrl = getBaseUrl(imageUrl);
 
+        console.log("blurElement called with baseUrl:", baseUrl, state.revealedImages[baseUrl], !state.censorEnabled || state.revealedImages[baseUrl] || element.dataset.censored);
         if (!state.censorEnabled || state.revealedImages[baseUrl] || element.dataset.censored) return element; // Skip if already revealed
 
-        console.log("blurElement called with baseUrl:", baseUrl);
         const isLargeEnough = element.offsetWidth >= 60 || element.offsetHeight >= 60;
         if (!imageUrl || !isLargeEnough) return element;
 
@@ -113,17 +113,31 @@ const ImageCensor = (() => {
     const removeAllCensors = () => {
         const elements = Array.from(document.querySelectorAll("[data-censored]"));
         elements.forEach(element => {
-            element.style.filter = "none";
-            delete element.dataset.censored;
+            uncensorImage(state, element.src);
         });
-        //also remove all label with class bestie-nsfw-label
-        const labels = Array.from(document.querySelectorAll(".bestie-nsfw-label"));
+        //also remove all label with class bestie-nsfw-l;abel
+        const labels = Array.from(document.querySelectorAll(".bestie-label"));
         labels.forEach(label => {
             label.remove()
         });
     };
-    
     const uncensorImage = (state, imageUrl) => {
+        const baseUrl = getBaseUrl(imageUrl);
+        state.revealedImages[baseUrl] = true; // Store based on baseUrl
+
+        const elements = Array.from(document.querySelectorAll(`img[src*="${baseUrl}"][data-censored], div[data-censored]`)); // Select elements with baseUrl in src
+
+        elements.forEach(el => {
+            const elBaseUrl = getBaseUrl(el.tagName === 'IMG' ? el.src : el.style.backgroundImage.slice(4, -1).replace(/"/g, ""));
+            if (elBaseUrl && elBaseUrl.includes(baseUrl)) { // Check if element's baseUrl matches the revealed baseUrl
+                el.style.filter = "none";
+                delete el.dataset.censored;
+            }
+        });
+
+        // updateRevealedImages(state);
+    };
+    const uncensorWithRevealImage = (state, imageUrl) => {
         const baseUrl = getBaseUrl(imageUrl);
         state.revealedImages[baseUrl] = true; // Store based on baseUrl
 
@@ -223,8 +237,6 @@ const ImageCensor = (() => {
             }, () => resolve(newState))
         );
 
-
-
     const setupMessageListener = state => {
         chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
             console.log('Message received in content script:', message);
@@ -244,7 +256,7 @@ const ImageCensor = (() => {
                     removeAllCensors(newState); // Remove censor from all images
                 });
             } else if (message.action === "revealImage") {
-                uncensorImage(state, message.srcUrl);
+                uncensorWithRevealImage(state, message.srcUrl);
             }
         });
     };
