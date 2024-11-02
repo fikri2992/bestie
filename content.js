@@ -37,7 +37,8 @@ const ImageCensor = (() => {
     
     const blurElement = state => element => {
         const imageUrl = element.tagName === 'IMG' ? element.src : element.style.backgroundImage.slice(4, -1).replace(/"/g, "");
-        console.log("blurElement called with imageUrl:", imageUrl);
+        // console.log("blurElement called with imageUrl:", imageUrl);
+        if (imageUrl.includes('https://pbs.twimg.com/media/GbUxo4haUAApfGz')) console.log(element)
         // Check if imageUrl is a valid URL
         if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:') && !imageUrl.startsWith('blob:')) {
             return element; // Skip processing if not a valid URL
@@ -47,7 +48,7 @@ const ImageCensor = (() => {
         if (!state.censorEnabled || element.dataset.censored || state.revealedImages[baseUrl]) return element;
     
         // Check if the element has a background image and is large enough
-        const isLargeEnough = element.offsetWidth >= 128 || element.offsetHeight >= 128;
+        const isLargeEnough = element.offsetWidth >= 60 || element.offsetHeight >= 60;
         if (!imageUrl || !isLargeEnough) return element;
     
         // Check if the element already has a blur filter with 40px and !important
@@ -68,7 +69,9 @@ const ImageCensor = (() => {
         images.forEach(element => {
             blurElement(state)(element)
             // Start scanning images when the content script runs
-            scanImages(element, state);
+            setTimeout(() => {
+                scanImages(element, state);
+            }, 100);
             // checkNSFWContent(state, model, [element]);
         });
     };
@@ -94,7 +97,7 @@ const ImageCensor = (() => {
     const observeNewImages = (state) => {
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
-                if (mutation.type === 'attributes') {
+                if (mutation.type === 'attributes' ) {
                     const target = mutation.target;
                     if (
                         (mutation.attributeName === 'src' && target.tagName === 'IMG') ||
@@ -106,6 +109,20 @@ const ImageCensor = (() => {
                         }, 100);
                         // scanImages(target, state);
                     }
+                }
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const images = node.querySelectorAll('img, div[style*="background-image"]');
+                            images.forEach((img) => {
+                                blurElement(state)(img);
+                                // if (img.tagName !== 'IMG') console.log('ini div', img)
+                                setTimeout(() => {
+                                    scanImages(img, state);
+                                }, 100);
+                            });
+                        }
+                    });
                 }
             });
         });
@@ -193,7 +210,30 @@ const ImageCensor = (() => {
 
         parentElement.appendChild(label);
     };
+    const addSFWLabel = (element, probability) => {
+        const label = document.createElement('div');
+        // add specific class to the label
+        label.classList.add('bestie-sfw-label');
+        label.textContent = `SFW (${(probability * 100).toFixed(2)}%)`;
+        label.style.position = 'absolute';
+        label.style.top = '0';
+        label.style.left = '0';
+        label.style.backgroundColor = 'rgba(0, 255, 0, 0.7)';
+        label.style.color = 'black';
+        label.style.padding = '4px';
+        label.style.fontSize = '14px';
+        label.style.fontWeight = 'bold';
+        label.style.zIndex = '1000';    
+        label.style.isolation = 'isolate'; // Add isolation property
 
+
+        const parentElement = element.parentElement;
+        if (parentElement && window.getComputedStyle(parentElement).position === "static") {
+            parentElement.style.position = "relative";
+        }
+
+        parentElement.appendChild(label);
+    };
     // Function to scan images on the page
     function scanImages(img, state) {
         if (img.complete && img.naturalHeight !== 0) {
@@ -204,7 +244,7 @@ const ImageCensor = (() => {
     // Function to request image analysis
     function analyzeImage(img, state) {
         const imageUrl = img.src;
-        const isLargeEnough = img.offsetWidth >= 128 || img.offsetHeight >= 128;
+        const isLargeEnough = img.offsetWidth >= 60 || img.offsetHeight >= 60;
         if (!isLargeEnough) return img;
         blurElement(state)(img);
         // Send message to background script to analyze the image
@@ -229,14 +269,16 @@ const ImageCensor = (() => {
             (pred) => pred.className === 'Neutral'
         )?.probability;
         // Add NSFW label if the probability is above the threshold
-        
-        if (nsfwProbability > 0.7) {
-            // addNSFWLabel(img, nsfwProbability);
+        if (nsfwProbability <= 0.7) console.log('NSFW Probability:', nsfwProbability, 'SFW Probability:', sfwProbability);
+        if (nsfwProbability > 0.6 && sfwProbability < 0.8) {
         } 
+        
         addNSFWLabel(img, nsfwProbability);
-        if (sfwProbability > 0.9){
+        if (sfwProbability > 0.8){
             // uncensorImage(state, img.src);
+            addSFWLabel(img, sfwProbability);
         }
+        
     }
 
     const init = async () => {
