@@ -56,25 +56,34 @@
             </div>
             <div id="settings" class="content">
                 <div class="settings-container">
-                    <button id="clearChatButton">Clear Chat</button>
-                    <div class="setting-item mt-4">
+                    <h3>Settings</h3>
+                    <div class="setting-item">
                         <span>Enable Image Censor</span>
                         <label class="switch">
                             <input type="checkbox" id="censorToggle">
                             <span class="slider"></span>
                         </label>
                     </div>
+                    <button id="clearChatButton" class="danger-button">Clear Chat</button>
                     <button id="clearAllDataButton" class="danger-button">Clear All Data</button>
                 </div>
-                <div class="allowlist-container">
-                    <h3>Allowlist</h3>
-                    <textarea id="allowlistTextarea" class="allowlist-textarea" rows="5" placeholder="Enter websites to allowlist (one per line)"></textarea>
-                    <button id="saveAllowlistButton" class="allowlist-button">Save Allowlist</button>
-                </div>
+                <details class="collapsible-section">
+                    <summary>Allowlist</summary>
+                    <div class="allowlist-container">
+                        <textarea id="allowlistTextarea" class="allowlist-textarea" rows="5" placeholder="Enter websites to allowlist (one per line)"></textarea>
+                        <button id="saveAllowlistButton" class="allowlist-button">Save Allowlist</button>
+                    </div>
+                </details>
+                <details class="collapsible-section">
+                    <summary>Bad Words</summary>
+                    <div class="badwords-container">
+                        <textarea id="badWordsTextarea" class="badwords-textarea" rows="5" placeholder="Enter bad words to block (one per line)"></textarea>
+                        <button id="saveBadWordsButton" class="badwords-button">Save Bad Words</button>
+                    </div>
+                </details>
             </div>
         </div>
-    </div>
-    <script src="./js/socket.io.min.js"></script>
+    </div>    <script src="./js/socket.io.min.js"></script>
     <script src="popup.js"></script>
 </body>
 

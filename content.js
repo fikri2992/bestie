@@ -1,5 +1,4 @@
 // contentScript.js
-console.log('Content script loaded on', window.location.href);
 
 const ImageCensor = (() => {
     let observersEnabled = false;
@@ -19,12 +18,13 @@ const ImageCensor = (() => {
     };
     const loadSettings = () =>
         new Promise(resolve =>
-            chrome.storage.local.get(["censorEnabled", "blurIntensity", "revealedImages", "allowlist"], result =>
+            chrome.storage.local.get(["censorEnabled", "blurIntensity", "revealedImages", "allowlist", "badWords"], result =>
                 resolve({
                     censorEnabled: result.censorEnabled !== false,
                     blurIntensity: result.blurIntensity || defaultState.blurIntensity,
                     revealedImages: result.revealedImages || {},
-                    allowlist: result.allowlist || []
+                    allowlist: result.allowlist || [],
+                    badWords: result.badWords || []
                 })
             )
         );
@@ -76,18 +76,34 @@ const ImageCensor = (() => {
                 imageUrl = backgroundImage.slice(5, -2); // Extract URL from url("...")
             }
         }
-        const baseUrl = getBaseUrl(imageUrl);
+        
         // Check if the imageUrl matches the desired URL
         if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:') && !imageUrl.startsWith('blob:')) {
             return element;
         }
     
-        if (!state.censorEnabled || state.revealedImages[baseUrl] || element.dataset.censored) return element; // Skip if already revealed
+        const baseUrl = getBaseUrl(imageUrl);
+        
+        if (!state.censorEnabled) {
+            return element;
+        }
+        
+        if (state.revealedImages[baseUrl]) {
+            return element;
+        }
+        
+        if (element.dataset.censored) {
+            return element;
+        }
     
         const isLargeEnough = element.offsetWidth >= 60 || element.offsetHeight >= 60;
-        if (!imageUrl || !isLargeEnough) return element;
+        
+        if (!imageUrl || !isLargeEnough) {
+            return element;
+        }
     
         const currentFilter = element.style.getPropertyValue('filter');
+        
         if (currentFilter && currentFilter.includes(`blur(${state.blurIntensity}px)`) && currentFilter.includes('!important')) {
             return element;
         }
@@ -98,6 +114,7 @@ const ImageCensor = (() => {
     
         return element;
     };
+    
     
     const censorAllImages = state => {
         const images = Array.from(document.querySelectorAll("img, div[style*='background-image']"));
@@ -128,11 +145,6 @@ const ImageCensor = (() => {
                     imageUrl = backgroundImage.slice(5, -2); // Extract URL from url("...")
                 }
             }
-
-            // const baseUrl = getBaseUrl(imageUrl);
-            // if (baseUrl) {
-            //     state.revealedImages[baseUrl] = true; // Store based on baseUrl
-            // }
 
             if (element.hasAttribute("data-censored")) {
                 if (element.tagName === 'IMG') {
@@ -167,13 +179,13 @@ const ImageCensor = (() => {
     const uncensorWithRevealImage = (state, imageUrl) => {
         const baseUrl = getBaseUrl(imageUrl);
         state.revealedImages[baseUrl] = true; // Store based on baseUrl
-
         const elements = Array.from(document.querySelectorAll(`img[src*="${baseUrl}"][data-censored], div[data-censored]`)); // Select elements with baseUrl in src
 
         elements.forEach(el => {
             const elBaseUrl = getBaseUrl(el.tagName === 'IMG' ? el.src : el.style.backgroundImage.slice(4, -1).replace(/"/g, ""));
             if (elBaseUrl && elBaseUrl.includes(baseUrl)) { // Check if element's baseUrl matches the revealed baseUrl
                 el.style.filter = "none";
+                el.classList.remove("censored-image");
                 delete el.dataset.censored;
             }
         });
@@ -183,7 +195,6 @@ const ImageCensor = (() => {
 
     const observeNewImages = (state) => {
         if (observersEnabled) {
-            console.warn('observeNewImages is already enabled. Skipping initialization.');
             return;
         }
 
@@ -254,7 +265,6 @@ const ImageCensor = (() => {
             });
             observersEnabled = true;
         } else {
-            console.warn('Document body not found. Retrying in 100ms...');
             setTimeout(() => observeNewImages(state), 100);
         }
     };
@@ -281,7 +291,6 @@ const ImageCensor = (() => {
 
     const setupMessageListener = state => {
         chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
-            console.log('Message received in content script:', message);
             if (message.action === 'enableCensor') {
                 const newState = {
                     ...state,
@@ -383,9 +392,9 @@ const ImageCensor = (() => {
                 type: 'ANALYZE_IMAGE',
                 imageUrl: imageUrl
             }, (response) => {
-                if (response.type === 'ANALYSIS_RESULT') {
+                if (response?.type === 'ANALYSIS_RESULT') {
                     handleAnalysisResult(img, response.result, state);
-                } else if (response.type === 'ANALYSIS_ERROR') {
+                } else if (response?.type === 'ANALYSIS_ERROR') {
                     console.error('Analysis error:', response.error);
                 }
             });
@@ -418,8 +427,8 @@ const ImageCensor = (() => {
             labels.push(label);
         }
 
-        const parentElement = element.parentElement;
-        removeExistingLabels(parentElement);
+        const parentElement = element?.parentElement;
+        if (parentElement) removeExistingLabels(parentElement);
         appendLabels(parentElement, labels);
 
         if (probabilities['Neutral'] > 0.8) {
@@ -431,16 +440,14 @@ const ImageCensor = (() => {
         try {
             const state = await loadSettings();
             setupMessageListener(state);
-
-            // Check if the current website is in the allowlist
             if (state.allowlist.some(url => window.location.href.includes(url))) {
-                console.log('Current website is allowlisted. Skipping censoring.');
-                return; // Exit the init function without censoring
+                return;
             }
 
             if (state.censorEnabled) {
-                censorAllImages(state); // instantly censor all images
-                observeNewImages(state); // gradually censor new images
+                censorAllImages(state);
+                observeNewImages(state);
+                censorBadWords(state); // Add this line
             }
         } catch (error) {
             console.error('Error loading NSFWJS:', error);
@@ -453,3 +460,18 @@ const ImageCensor = (() => {
 })();
 
 ImageCensor.init();
+
+function censorBadWords(state) {
+    const elements = document.getElementsByTagName('*');
+    const regex = new RegExp(`\\b(${state.badWords.join('|')})\\b`, 'gi');
+
+    for (const element of elements) {
+        if (element.childNodes.length === 1 && element.childNodes[0].nodeType === Node.TEXT_NODE) {
+            const text = element.textContent;
+            const replacedText = text.replace(regex, match => '*'.repeat(match.length));
+            if (replacedText !== text) {
+                element.textContent = replacedText;
+            }
+        }
+    }
+}

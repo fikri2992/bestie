@@ -350,3 +350,27 @@ saveAllowlistButton.addEventListener('click', saveAllowlist);
 document.addEventListener('DOMContentLoaded', loadAllowlist);
 
 // ... existing code ...
+
+// Function to save bad words
+function saveBadWords() {
+    const badWordsTextarea = document.getElementById('badWordsTextarea');
+    const badWords = badWordsTextarea.value.split('\n').map(word => word.trim()).filter(word => word !== '');
+    chrome.storage.local.set({ badWords }, () => {
+        console.log('Bad words saved');
+    });
+}
+
+// Function to load bad words
+function loadBadWords() {
+    chrome.storage.local.get(['badWords'], (result) => {
+        const badWordsTextarea = document.getElementById('badWordsTextarea');
+        badWordsTextarea.value = result.badWords ? result.badWords.join('\n') : '';
+    });
+}
+
+// Event listener for saving bad words
+const saveBadWordsButton = document.getElementById('saveBadWordsButton');
+saveBadWordsButton.addEventListener('click', saveBadWords);
+
+// Load bad words when popup is opened
+document.addEventListener('DOMContentLoaded', loadBadWords);

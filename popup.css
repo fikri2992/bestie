@@ -382,22 +382,45 @@ input:checked+.slider:before {
 .form-container button:hover {
     background-color: var(--primary-color-hover);
 }
+
+/* Settings styles */
+.settings-container {
+    padding: 20px;
+}
+
+.settings-container h3 {
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.setting-item span {
+    font-size: 16px;
+}
+
 .danger-button {
-    background-color: #ff4d4d;
+    background-color: var(--danger-color);
     color: white;
     border: none;
     padding: 10px 20px;
     text-align: center;
     text-decoration: none;
-    display: inline-block;
+    display: block;
     font-size: 16px;
-    margin: 10px 0;
+    margin-bottom: 10px;
     cursor: pointer;
     border-radius: 4px;
+    width: 100%;
 }
 
 .danger-button:hover {
-    background-color: #cc0000;
+    background-color: var(--danger-color-hover);
 }
 
 .form-container input[type="text"]:focus,
@@ -408,37 +431,143 @@ input:checked+.slider:before {
 }
 
 .allowlist-container {
-    margin-top: 20px;
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+}
+
+.allowlist-container h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
 }
 
 .allowlist-textarea {
     width: 100%;
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--input-border-color);
     border-radius: 4px;
     resize: vertical;
     font-family: Arial, sans-serif;
     font-size: 14px;
     line-height: 1.4;
     box-sizing: border-box;
+    margin-bottom: 10px;
 }
 
 .allowlist-button {
-    display: block;
-    width: 100%;
-    padding: 10px;
-    margin-top: 10px;
-    background-color: #007bff;
-    color: #fff;
+    background-color: var(--primary-color);
+    color: white;
     border: none;
-    border-radius: 4px;
-    font-size: 16px;
-    font-weight: bold;
+    padding: 10px 20px;
     text-align: center;
+    text-decoration: none;
+    display: block;
+    font-size: 16px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    border-radius: 4px;
+    width: 100%;
 }
 
 .allowlist-button:hover {
-    background-color: #0056b3;
+    background-color: var(--primary-color-hover);
+}
+
+/* ... (your existing styles) ... */
+
+/* Bad Words styles */
+.badwords-container {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+}
+
+.badwords-container h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.badwords-textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--input-border-color);
+    border-radius: 4px;
+    resize: vertical;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+}
+
+.badwords-button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 4px;
+    width: 100%;
+}
+
+.badwords-button:hover {
+    background-color: var(--primary-color-hover);
+}
+
+/* ... (existing styles) ... */
+
+/* Collapsible section styles */
+.collapsible-section {
+    margin-top: 20px;
+    border: none;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.collapsible-section summary {
+    padding: 15px;
+    background-color: var(--primary-color);
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+    outline: none;
+    transition: background-color 0.3s ease;
+}
+
+.collapsible-section summary:hover {
+    background-color: var(--primary-color-hover);
+}
+
+.collapsible-section[open] summary {
+    border-bottom: 1px solid var(--input-border-color);
+}
+
+.collapsible-section .allowlist-container,
+.collapsible-section .badwords-container {
+    margin-top: 0;
+    border-radius: 0;
+    border: none;
+    padding: 20px;
+    background-color: #f9f9f9;
+}
+
+.collapsible-section .allowlist-container h3,
+.collapsible-section .badwords-container h3 {
+    margin-top: 0;
+}
+
+.collapsible-section .allowlist-textarea,
+.collapsible-section .badwords-textarea {
+    background-color: white;
+}
+
+.collapsible-section .allowlist-button,
+.collapsible-section .badwords-button {
+    margin-top: 10px;
 }

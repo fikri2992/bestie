@@ -19,6 +19,7 @@ chrome.contextMenus.create({
 
 chrome.contextMenus.onClicked.addListener(function (info, tab) {
     if (info.menuItemId === "revealImage") {
+        console.log("this info", info)
         chrome.tabs.sendMessage(tab.id, {
             action: 'revealImage',
             srcUrl: info.srcUrl
