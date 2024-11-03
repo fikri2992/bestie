@@ -116,6 +116,8 @@ body {
     border-radius: 18px;
     max-width: 80%;
     clear: both;
+    min-width: 35px; /* Set a minimum width */
+    min-height: 40px; /* Set a minimum height */
 }
 
 .user {
@@ -128,12 +130,14 @@ body {
 
 .server {
     background-color: #E5E5EA;
-    /* Light gray bubble for server */
     color: black;
-    /* Black text color for better contrast */
     float: left;
+    min-width: 35px; /* Ensure consistent width */
+    min-height: 40px; /* Ensure consistent height */
+    display: flex;
+    align-items: center; /* Center content vertically */
+    justify-content: center; /* Center content horizontally */
 }
-
 /* ... (previous styles) ... */
 
 /* Tab styling */
@@ -248,11 +252,11 @@ body {
     /* Adjust width as needed */
     overflow: hidden;
     white-space: nowrap;
-    animation: typing 1s steps(3) infinite;
+    /* animation: typing 1.5s steps(3, end) infinite; / */
     /* Adjust animation duration and steps as needed */
 }
 
-@keyframes typing {
+/* @keyframes typing {
     0% {
         width: 0;
     }
@@ -264,7 +268,7 @@ body {
     100% {
         width: 0;
     }
-}
+} */
 
 .switch {
     position: relative;

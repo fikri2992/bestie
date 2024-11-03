@@ -6,6 +6,7 @@ const clearChatButton = document.getElementById('clearChatButton');
 const attachImageButton = document.getElementById('attachImageButton');
 const imageUpload = document.getElementById('imageUpload');
 const socket = io('http://localhost:3000');
+let typingInterval;
 // Function to load chat messages from storage
 function loadChatMessages() {
     //console log all storage local
@@ -15,6 +16,8 @@ function loadChatMessages() {
             result.chatMessages.forEach(message => {
                 addMessage(message.text, message.sender, message.imageData);
             });
+            // Scroll to the bottom after loading all messages
+            
         }
     });
 
@@ -41,7 +44,9 @@ function addMessage(message, sender, messageData = null) {
     } else {
         messageElement.textContent = message;
     }
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    setTimeout(() => {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }, 100);
 }
 
 // Function to save chat messages to storage
@@ -133,7 +138,6 @@ socket.on('chat message', (data) => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
         saveChatMessages(); // Save messages after receiving
     }, 700); // Adjust delay as needed
-
 
 });
 // Function to send the message
@@ -374,3 +378,47 @@ saveBadWordsButton.addEventListener('click', saveBadWords);
 
 // Load bad words when popup is opened
 document.addEventListener('DOMContentLoaded', loadBadWords);
+
+
+// Function to start the typing animation
+function startTypingAnimation() {
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message', 'server');
+    
+    const typingDots = document.createElement('span');
+    typingDots.classList.add('typing-dots');
+    typingDots.innerHTML = '...'; // Start with one dot
+    
+    messageElement.appendChild(typingDots); // Append dots inside the bubble
+    chatMessages.appendChild(messageElement);
+    setTimeout(() => {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }, 500);
+
+    let dotCount = 1;
+    typingInterval = setInterval(() => {
+        typingDots.innerHTML = '.'.repeat(dotCount);
+        dotCount = (dotCount % 4) +1; // Cycle through 1, 2, 3, 4 dots
+    }, 400);
+}
+
+// Function to stop the typing animation
+function stopTypingAnimation() {
+    clearInterval(typingInterval); // Stop the animation
+    const typingDots = document.querySelector('.typing-dots');
+    if (typingDots) {
+        typingDots.parentElement.remove(); // Remove the entire message bubble
+    }
+}
+
+// Receive LOADING_CHAT_START and LOADING_CHAT_END messages
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'LOADING_CHAT_START') {
+        console.log('Received LOADING_CHAT_START message');
+        startTypingAnimation();
+    }
+    if (message.type === 'LOADING_CHAT_END') {
+        stopTypingAnimation();
+    }
+});
+

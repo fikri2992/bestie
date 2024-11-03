@@ -9,7 +9,8 @@
         "storage",
         "activeTab",
         "tabs",
-        "contextMenus"
+        "contextMenus",
+        "tabCapture"
     ],
     "content_scripts": [{
         "matches": ["<all_urls>"],
