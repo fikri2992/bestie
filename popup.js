@@ -420,5 +420,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'LOADING_CHAT_END') {
         stopTypingAnimation();
     }
+    if (message.action === 'focusChatInput') {
+        const chatInput = document.querySelector('#main-chat-input'); // Adjust the selector as needed
+        if (chatInput) {
+            chatInput.focus();
+        }
+    }
 });
-

@@ -9,26 +9,27 @@ chrome.runtime.onInstalled.addListener(() => {
         //     await sendResponse(response);
         // });
     });
+    chrome.contextMenus.create({
+        id: "revealImage",
+        title: "Reveal Image",
+        contexts: ["image"]
+    });
+    
+    chrome.contextMenus.create({
+        id: "askBestieAboutImage",
+        title: "Ask Bestie about this image",
+        contexts: ["image"]
+    });
+    
+    // Add a context menu item for selected text
+    chrome.contextMenus.create({
+        id: "askBestieAboutText",
+        title: "Ask Bestie about this text",
+        contexts: ["selection"]
+    });
 });
 
-chrome.contextMenus.create({
-    id: "revealImage",
-    title: "Reveal Image",
-    contexts: ["image"]
-});
 
-chrome.contextMenus.create({
-    id: "askBestieAboutImage",
-    title: "Ask Bestie about this image",
-    contexts: ["image"]
-});
-
-// Add a context menu item for selected text
-chrome.contextMenus.create({
-    id: "askBestieAboutText",
-    title: "Ask Bestie about this text",
-    contexts: ["selection"]
-});
 
 chrome.contextMenus.onClicked.addListener(function (info, tab) {
     if (info.menuItemId === "revealImage") {
@@ -204,3 +205,20 @@ async function ensureOffscreenDocument() {
             console.error('Error asking Bestie about text:', error);
         });
     }
+
+chrome.commands.onCommand.addListener((command) => {
+    if (command === "open_popup") {
+        chrome.windows.getAll({ populate: true, windowTypes: ['popup'] }, (windows) => {
+            const popupWindow = windows.find(window => window.tabs.some(tab => tab.url.includes('popup.html')));
+            if (!popupWindow) {
+                chrome.action.openPopup();
+            } else {
+                // Focus the existing popup window
+                chrome.windows.update(popupWindow.id, { focused: true });
+            }
+        });
+
+        // Send a message to the popup to focus the chat input field
+        chrome.runtime.sendMessage({ action: 'focusChatInput' });
+    }
+});

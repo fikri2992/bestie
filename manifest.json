@@ -32,5 +32,13 @@
     "host_permissions": ["<all_urls>"],
     "action": {
         "default_popup": "popup.html"
+    },
+    "commands": {
+        "open_popup": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+Y"
+            },
+            "description": "Open the popup and focus on chat input"
+        }
     }
 }
