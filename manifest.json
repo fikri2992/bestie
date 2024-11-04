@@ -39,6 +39,18 @@
                 "default": "Ctrl+Shift+Y"
             },
             "description": "Open the popup and focus on chat input"
+        },
+        "toggle_image_censor": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+E"
+            },
+            "description": "Toggle Image Censor"
+        },
+        "reveal_focused_image": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+S"
+            },
+            "description": "Reveal the focused image"
         }
     }
 }

@@ -86,19 +86,18 @@ if (window !== window.top) {
                     imageUrl = backgroundImage.slice(5, -2); // Extract URL from url("...")
                 }
             }
-    
             // Check if the imageUrl matches the desired URL
             if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://') && !imageUrl.startsWith('data:') && !imageUrl.startsWith('blob:')) {
                 return element;
             }
-    
+            
             const FullUrl = getFullUrl(imageUrl);
-    
+            
             if (!state.censorEnabled) {
                 return element;
             }
     
-            if (state.revealedImages[FullUrl] && state.strictMode) {
+            if (state.revealedImages[FullUrl] ) {
                 return element;
             }
     
@@ -106,22 +105,24 @@ if (window !== window.top) {
                 return element;
             }
     
-            const isLargeEnough = element.offsetWidth >= 60 || element.offsetHeight >= 60;
-    
-            if (!imageUrl || !isLargeEnough) {
+            const isLargeEnough = (element.offsetWidth >= 60 || element.offsetHeight >= 60) || (element.offsetWidth === 0 || element.offsetHeight === 0);
+            if (imageUrl === 'https://pbs.twimg.com/media/GbjIFf9b0AAE5hN?format=jpg&name=large') {
+                console.log("asdasdasd", state.censorEnabled,  state.revealedImages[FullUrl], element.dataset.censored, imageUrl, isLargeEnough)
+            }
+            if (!isLargeEnough) {
                 return element;
             }
     
             const currentFilter = element.style.getPropertyValue('filter');
     
-            if (currentFilter && currentFilter.includes(`blur(${state.blurIntensity}px)`) && currentFilter.includes('!important')) {
+            if (currentFilter && currentFilter.includes(`blur(${state.blurIntensity}px)`) ) {
                 return element;
             }
     
             element.dataset.censored = "true";
             element.classList.add("censored-image");
             element.style.setProperty("filter", `blur(${state.blurIntensity}px)`, "important");
-            element.style.visibility = "visible";
+            // element.style.visibility = "visible";
             return element;
         };
     
@@ -363,8 +364,34 @@ if (window !== window.top) {
                     });
                 } else if (message.action === 'toggleStrictMode') {
                     state.strictMode = message.strictMode;
-                    updateEnabledState(state);
-                    censorAllImages(state);
+                    //add prompt confirm alert this will reload the page 
+                    if (state.strictMode) {
+                        const confirmReload = confirm('Strict mode is now enabled. This will reload the page. Do you want to continue?');
+                        if (confirmReload) {
+                            updateEnabledState(state);
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 100);
+                        } else {
+                            state.strictMode = false;
+                            updateEnabledState(state);
+                        }
+                    }
+                    
+                    // updateEnabledState(state);
+                    // censorAllImages(state);
+                } else if (message.action === 'revealFocusedImage') {
+                    const focusedElement = document.activeElement;
+                    console.log('Focused element:', focusedElement);
+                    const images = focusedElement.querySelectorAll("img, div[style*='background-image']");
+                    if (images.length > 0) {
+                        images.forEach(element => {
+                            uncensorWithRevealImage(state, element.src);
+                        });
+                        
+                    } else {
+                        console.log('No images found in the focused element.');
+                    }
                 }
             });
         };
@@ -516,7 +543,6 @@ if (window !== window.top) {
                 acc[pred.className] = pred.probability;
                 return acc;
             }, {});
-            console.log('showLabels:', state);
             // if (state.showLabels) {
                 const highestProbabilityClass = getHighestProbabilityClass(probabilities);
                 const labels = [];
@@ -541,9 +567,9 @@ if (window !== window.top) {
                 if (parentElement) removeExistingLabels(parentElement);
                 appendLabels(parentElement, labels, state);
             // }
-            console.log(state);
-            if (!state.strictMode && (probabilities['Neutral'] > 0.8 || probabilities['Drawing'] > 0.8)) {
-                uncensorImage(state, element.src);
+            console.log(state.strictMode)
+            if ((probabilities['Neutral'] > 0.8 || probabilities['Drawing'] > 0.8)) {
+                if (!state.strictMode) uncensorImage(state, element.src);
             }
         }
     

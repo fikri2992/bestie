@@ -254,6 +254,26 @@ chrome.commands.onCommand.addListener((command) => {
         // Send a message to the popup to focus the chat input field
         chrome.runtime.sendMessage({ action: 'focusChatInput' });
     }
+    if (command === "toggle_image_censor") {
+        chrome.storage.local.get(['censorEnabled'], (result) => {
+            const newCensorState = !result.censorEnabled;
+            chrome.storage.local.set({ censorEnabled: newCensorState }, () => {
+                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    if (tabs[0]) {
+                        const action = newCensorState ? 'enableCensor' : 'disableCensor';
+                        chrome.tabs.sendMessage(tabs[0].id, { action: action });
+                    }
+                });
+            });
+        });
+    }
+    if (command === "reveal_focused_image") {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0]) {
+                chrome.tabs.sendMessage(tabs[0].id, { action: 'revealFocusedImage' });
+            }
+        });
+    }
 });
 
 
