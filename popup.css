@@ -51,7 +51,7 @@ body {
     display: flex;
     align-items: center;
     background-color: #f0f0f0;
-    border-radius: 20px;
+    border-radius: 5px;
     flex: 1;
     margin-right: 10px;
 }
@@ -61,7 +61,7 @@ body {
     padding: 10px;
     border: none;
     background-color: transparent;
-    border-radius: 20px;
+    border-radius: 0px;
 }
 
 .input-text:focus {
@@ -574,4 +574,9 @@ input:checked+.slider:before {
 .collapsible-section .allowlist-button,
 .collapsible-section .badwords-button {
     margin-top: 10px;
+}
+
+#main-chat-input {
+    max-height: 150px;
+    overflow: auto;
 }

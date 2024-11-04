@@ -9,24 +9,30 @@ chrome.runtime.onInstalled.addListener(() => {
         //     await sendResponse(response);
         // });
     });
-    chrome.contextMenus.create({
-        id: "revealImage",
-        title: "Reveal Image",
-        contexts: ["image"]
-    });
-    
-    chrome.contextMenus.create({
-        id: "askBestieAboutImage",
-        title: "Ask Bestie about this image",
-        contexts: ["image"]
-    });
-    
-    // Add a context menu item for selected text
-    chrome.contextMenus.create({
-        id: "askBestieAboutText",
-        title: "Ask Bestie about this text",
-        contexts: ["selection"]
-    });
+});
+
+chrome.contextMenus.create({
+    id: "revealImage",
+    title: "Reveal Image",
+    contexts: ["image"]
+});
+
+chrome.contextMenus.create({
+    id: "askBestieAboutImage",
+    title: "Ask Bestie about this image",
+    contexts: ["image"]
+});
+
+// Add a context menu item for selected text
+chrome.contextMenus.create({
+    id: "askBestieAboutText",
+    title: "Ask Bestie about this text",
+    contexts: ["selection"]
+});
+chrome.contextMenus.create({
+    id: "bestieThinking",
+    title: "Bestie Thinking",
+    contexts: ["all"]
 });
 
 
@@ -47,6 +53,11 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
         chrome.tabs.sendMessage(tab.id, {
             action: 'askBestieAboutText',
             selectedText: info.selectionText
+        });
+    } else if (info.menuItemId === "bestieThinking") {
+        console.log("asdasdasdas")
+        chrome.tabs.sendMessage(tab.id, {
+            action: 'bestieThinking'
         });
     }
 });
@@ -132,6 +143,28 @@ async function ensureOffscreenDocument() {
                     });
             });
             return true; // Required to use sendResponse asynchronously
+        }
+        if (message.action === 'bestieThinking') {
+            console.log("bestieThinking", message)
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                const activeTab = tabs[0];
+                chrome.tabs.captureVisibleTab(activeTab.windowId, { format: 'jpeg', quality: 100 }, (screenshotUrl) => {
+                    fetch(screenshotUrl)
+                        .then(response => response.blob())
+                        .then(screenshotBlob => {
+                            // chrome.tabs.sendMessage(activeTab.id, { action: 'getPageText' }, (response) => {
+                                // const pageText = response.text;
+                                setTimeout(() => {
+                                    handleBestieThinking(screenshotBlob, message.text, message.currentUrl);
+                                }, 100);
+                            // });
+                        })
+                        .catch(error => {
+                            console.error('Error capturing screenshot:', error);
+                        });
+                });
+            });
+            return true;
         }
     });
 
@@ -222,3 +255,32 @@ chrome.commands.onCommand.addListener((command) => {
         chrome.runtime.sendMessage({ action: 'focusChatInput' });
     }
 });
+
+
+
+
+
+function handleBestieThinking(screenshotBlob, pageText, currentUrl) {
+    const formData = new FormData();
+    formData.append('screenshot', screenshotBlob, 'screenshot.jpg');
+    formData.append('context', { text:pageText, currentUrl });
+    chrome.runtime.sendMessage({ type: 'LOADING_CHAT_START' });
+
+    fetch('http://localhost:3000/thinking', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            response.json().then(data => {
+                console.log('Screenshot and context uploaded successfully', data);
+                chrome.runtime.sendMessage({ type: 'LOADING_CHAT_END' });
+            });
+        } else {
+            console.error('Error uploading screenshot and context:', response.statusText);
+        }
+    })
+    .catch(error => {
+        console.error('Error in Bestie Thinking:', error);
+    });
+}

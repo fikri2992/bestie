@@ -1,6 +1,7 @@
 // Get DOM elements
 const chatMessages = document.querySelector('.chat-messages');
-const chatInput = document.querySelector('.chat-input input');
+const chatInput = document.getElementById('main-chat-input');
+
 const sendButton = document.querySelector('.send-button');
 const clearChatButton = document.getElementById('clearChatButton');
 const attachImageButton = document.getElementById('attachImageButton');
@@ -92,12 +93,9 @@ sendButton.addEventListener('click', () => {
     saveChatMessages(); // Save messages after sending
 });
 
-chatInput.addEventListener('keyup', (event) => {
-    if (event.key === 'Enter') {
-        sendMessage();
-        saveChatMessages(); // Save messages after sending
-    }
-});
+// chatInput.addEventListener('keyup', (event) => {
+
+// });
 
 clearChatButton.addEventListener('click', clearChat);
 
@@ -140,15 +138,39 @@ socket.on('chat message', (data) => {
     }, 700); // Adjust delay as needed
 
 });
+
+// Adjust textarea height automatically
+chatInput.addEventListener('input', () => {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = chatInput.scrollHeight + 'px';
+});
+
+// Handle keydown events
+chatInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && chatInput.value) {
+        if (!e.shiftKey) {
+            // Prevent default behavior
+            e.preventDefault();
+            // Trigger send message function
+            sendMessage();
+            // Clear the input
+            chatInput.value = '';
+            // Reset the height
+            chatInput.style.height = 'auto';
+        }
+        // If Shift+Enter, allow the newline (default behavior)
+    }
+});
+
 // Function to send the message
 function sendMessage() {
     const messageText = chatInput.value.trim();
     const messageData = {}; // Start with an empty object
 
     // Determine message type
-    if (imageUpload.files.length > 0 && messageText !== "") {
+    if (imageUpload?.files?.length > 0 && messageText !== "") {
         messageData.type = 'text_image'; // Both text and image
-    } else if (imageUpload.files.length > 0) {
+    } else if (imageUpload?.files?.length > 0) {
         messageData.type = 'image'; // Image only
     } else {
         messageData.type = 'text'; // Text only
@@ -160,7 +182,7 @@ function sendMessage() {
     }
 
     // Handle image upload (if any)
-    if (imageUpload.files.length > 0) {
+    if (imageUpload?.files?.length > 0) {
         const file = imageUpload.files[0];
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -172,18 +194,27 @@ function sendMessage() {
         // Send text-only message immediately
         sendMessageToServer(messageData);
     }
+
+    // Reset the input height after sending
+
 }
 
 // Function to send the message to the server
 function sendMessageToServer(messageData) {
     sendPayload(messageData);
     addMessage('You', 'user', messageData);
-    chatInput.value = '';
-    imageUpload.value = ''; // Clear the file input
+    startTypingAnimation();
+    setTimeout(() => {
+        chatInput.style.height = '38px'; // Set a default minimal height
+        chatInput.value = '';
+    }, 100);
+    // imageUpload.value = ''; // Clear the file input
+    //reset height 
 }
 
 async function sendPayload(messageData) {
     try {
+        
         const response = await fetch('http://localhost:3000/api/message', {
             method: 'POST',
             headers: {
@@ -192,7 +223,7 @@ async function sendPayload(messageData) {
             },
             body: JSON.stringify(messageData)
         });
-
+        stopTypingAnimation();
         if (!response.ok) {
             throw new Error(`API request failed with status ${response.status}`);
         }
@@ -204,7 +235,7 @@ async function sendPayload(messageData) {
     } finally {
         // Clear input fields
         chatInput.value = '';
-        imageUpload.value = '';
+        // imageUpload.value = '';
     }
 
 }
@@ -238,11 +269,52 @@ contentAreas.forEach((area, index) => {
     }
 });
 
+// Add this function to handle the strict mode toggle
+function initializeStrictModeToggle() {
+    const strictModeToggle = document.getElementById('strictModeToggle');
+
+    // Load the current state of the strictMode setting
+    chrome.storage.local.get('strictMode', (result) => {
+        strictModeToggle.checked = result.strictMode === true;
+    });
+
+    strictModeToggle.addEventListener('change', function () {
+        const strictMode = strictModeToggle.checked;
+        chrome.storage.local.set({ strictMode: strictMode }, () => {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                chrome.tabs.sendMessage(tabs[0].id, { action: 'toggleStrictMode', strictMode: strictMode });
+            });
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     initializeCensorToggle();
+    initializeStrictModeToggle(); // Add this line
     checkUserProfile();
+    loadAllowlist();
+    loadBadWords();
+    toggleLabel();
 });
 
+function toggleLabel() {
+    const showLabelToggle = document.getElementById('showLabelToggle');
+
+    // Load the current state of the showLabels setting
+    chrome.storage.local.get('showLabels', (result) => {
+        showLabelToggle.checked = result.showLabels !== false;
+    });
+
+    showLabelToggle.addEventListener('change', function () {
+        const showLabels = showLabelToggle.checked;
+        console.log(showLabels)
+        chrome.storage.local.set({ showLabels: showLabels }, () => {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                chrome.tabs.sendMessage(tabs[0].id, { action: 'toggleShowLabels', showLabels: showLabels });
+            });
+        });
+    });
+}
 function initializeCensorToggle() {
     const censorToggle = document.getElementById('censorToggle');
     // Initialize the toggle based on stored settings
@@ -327,8 +399,6 @@ clearAllDataButton.addEventListener('click', () => {
     }
 });
 
-// ... existing code ...
-
 // Function to save allowlist
 function saveAllowlist() {
     const allowlistTextarea = document.getElementById('allowlistTextarea');
@@ -350,10 +420,6 @@ function loadAllowlist() {
 const saveAllowlistButton = document.getElementById('saveAllowlistButton');
 saveAllowlistButton.addEventListener('click', saveAllowlist);
 
-// Load allowlist when popup is opened
-document.addEventListener('DOMContentLoaded', loadAllowlist);
-
-// ... existing code ...
 
 // Function to save bad words
 function saveBadWords() {
@@ -375,9 +441,6 @@ function loadBadWords() {
 // Event listener for saving bad words
 const saveBadWordsButton = document.getElementById('saveBadWordsButton');
 saveBadWordsButton.addEventListener('click', saveBadWords);
-
-// Load bad words when popup is opened
-document.addEventListener('DOMContentLoaded', loadBadWords);
 
 
 // Function to start the typing animation
@@ -427,3 +490,5 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
     }
 });
+
+

@@ -12,7 +12,9 @@ if (window !== window.top) {
     
         const defaultState = {
             censorEnabled: true,
-            blurIntensity: 40
+            blurIntensity: 40,
+            showLabels: true,
+            strictMode: true,
         };
         const classNameMap = {
             'Drawing': 'Drawing',
@@ -23,15 +25,18 @@ if (window !== window.top) {
         };
         const loadSettings = () =>
             new Promise(resolve =>
-                chrome.storage.local.get(["censorEnabled", "blurIntensity", "revealedImages", "allowlist", "badWords"], result =>
-                    resolve({
+                chrome.storage.local.get(["censorEnabled", "blurIntensity", "revealedImages", "allowlist", "badWords", "showLabels", "strictMode"], result => {
+                    const finalResult = {
                         censorEnabled: result.censorEnabled !== false,
                         blurIntensity: result.blurIntensity || defaultState.blurIntensity,
                         revealedImages: result.revealedImages || {},
                         allowlist: result.allowlist || [],
-                        badWords: result.badWords || []
-                    })
-                )
+                        badWords: result.badWords || [],
+                        showLabels: result.showLabels === true,
+                        strictMode: result.strictMode === true,
+                    };
+                    return resolve(finalResult);
+                })
             );
     
         const getFullUrl = (url) => {
@@ -51,7 +56,7 @@ if (window !== window.top) {
     
         const blurElement = state => element => {
             let imageUrl = '';
-    
+            
             if (element.tagName === 'IMG') {
                 if (element.srcset) {
                     const srcset = element.srcset.split(',');
@@ -93,7 +98,7 @@ if (window !== window.top) {
                 return element;
             }
     
-            if (state.revealedImages[FullUrl]) {
+            if (state.revealedImages[FullUrl] && state.strictMode) {
                 return element;
             }
     
@@ -116,7 +121,7 @@ if (window !== window.top) {
             element.dataset.censored = "true";
             element.classList.add("censored-image");
             element.style.setProperty("filter", `blur(${state.blurIntensity}px)`, "important");
-    
+            element.style.visibility = "visible";
             return element;
         };
     
@@ -212,6 +217,7 @@ if (window !== window.top) {
                             (mutation.attributeName === 'src' && target.tagName === 'IMG') ||
                             (mutation.attributeName === 'style' && target.style.backgroundImage)
                         ) {
+                            // target.style.visibility = "hidden";
                             blurElement(state)(target);
                             setTimeout(() => {
                                 scanImages(target, state);
@@ -229,6 +235,7 @@ if (window !== window.top) {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
                         const img = entry.target;
+                        // img.style.visibility = "hidden";
                         blurElement(state)(img);
                         setTimeout(() => {
                             scanImages(img, state);
@@ -286,12 +293,19 @@ if (window !== window.top) {
             }
             observersEnabled = false;
         };
-    
+        const toggleLabels = (show) => {
+            const labels = document.querySelectorAll('.bestie-label');
+            labels.forEach(label => {
+                label.style.display = show ? 'block' : 'none';
+            });
+        };
         const updateEnabledState = newState =>
             new Promise(resolve =>
                 chrome.storage.local.set({
                     censorEnabled: newState.censorEnabled,
-                    blurIntensity: newState.blurIntensity
+                    blurIntensity: newState.blurIntensity,
+                    showLabels: newState.showLabels,
+                    strictMode: newState.strictMode
                 }, () => resolve(newState))
             );
         const setupMessageListener = state => {
@@ -331,6 +345,26 @@ if (window !== window.top) {
                             console.error('Failed to send screenshot and text');
                         }
                     });
+                } else if (message.action === 'bestieThinking') {
+                    const pageText = document.body.innerText;
+                    console.log('Bestie is thinking...', pageText);
+                    chrome.runtime.sendMessage({
+                        action: 'bestieThinking',
+                        text: pageText,
+                        currentUrl: window.location.href
+                    });
+                } else if (message.action === 'toggleShowLabels') {
+                    const newState = {
+                        ...state,
+                        showLabels: message.showLabels
+                    };
+                    updateEnabledState(newState).then(() => {
+                        toggleLabels(newState.showLabels);
+                    });
+                } else if (message.action === 'toggleStrictMode') {
+                    state.strictMode = message.strictMode;
+                    updateEnabledState(state);
+                    censorAllImages(state);
                 }
             });
         };
@@ -435,12 +469,19 @@ if (window !== window.top) {
             existingLabels.forEach(label => label.remove());
         }
     
-        function appendLabels(parentElement, labels) {
+        function appendLabels(parentElement, labels, state) {
             if (parentElement && window.getComputedStyle(parentElement).position === "static") {
                 parentElement.style.position = "relative";
             }
-    
-            labels.forEach(label => parentElement.appendChild(label));
+
+            labels.forEach(label => {
+                if (state.showLabels) {
+                    label.style.display = "block";
+                } else  {
+                    label.style.display = "none";
+                }
+                parentElement.appendChild(label)
+            });
         }
     
         // Function to scan images on the page
@@ -475,35 +516,87 @@ if (window !== window.top) {
                 acc[pred.className] = pred.probability;
                 return acc;
             }, {});
-    
-            const highestProbabilityClass = getHighestProbabilityClass(probabilities);
-            const labels = [];
-    
-            if (highestProbabilityClass.probability > 0.6) {
-                const {
-                    className,
-                    probability
-                } = highestProbabilityClass;
-                const label = createLabel(className, probability);
-                labels.push(label);
-            } else {
-                const {
-                    className,
-                    probability
-                } = highestProbabilityClass;
-                const label = createLabel('Unrecognized', probability, className);
-                labels.push(label);
-            }
-    
-            const parentElement = element ?.parentElement;
-            if (parentElement) removeExistingLabels(parentElement);
-            appendLabels(parentElement, labels);
-    
-            if (probabilities['Neutral'] > 0.8 || probabilities['Drawing'] > 0.8) {
+            console.log('showLabels:', state);
+            // if (state.showLabels) {
+                const highestProbabilityClass = getHighestProbabilityClass(probabilities);
+                const labels = [];
+        
+                if (highestProbabilityClass.probability > 0.6) {
+                    const {
+                        className,
+                        probability
+                    } = highestProbabilityClass;
+                    const label = createLabel(className, probability);
+                    labels.push(label);
+                } else {
+                    const {
+                        className,
+                        probability
+                    } = highestProbabilityClass;
+                    const label = createLabel('Unrecognized', probability, className);
+                    labels.push(label);
+                }
+        
+                const parentElement = element?.parentElement;
+                if (parentElement) removeExistingLabels(parentElement);
+                appendLabels(parentElement, labels, state);
+            // }
+            console.log(state);
+            if (!state.strictMode && (probabilities['Neutral'] > 0.8 || probabilities['Drawing'] > 0.8)) {
                 uncensorImage(state, element.src);
             }
         }
     
+        const censorTextNode = (state, textNode) => {
+            const regex = new RegExp(`\\b(${state.badWords.join('|')})\\b`, 'gi');
+            const text = textNode.textContent;
+            const replacedText = text.replace(regex, match => '*'.repeat(match.length));
+            // console.log(text)
+            if (replacedText !== text) {
+                textNode.textContent = replacedText;
+            }
+        };
+
+        const censorBadWords = (state) => {
+            const elements = document.getElementsByTagName('*');
+            for (const element of elements) {
+                if (element.childNodes.length === 1 && element.childNodes[0].nodeType === Node.TEXT_NODE) {
+                    censorTextNode(state, element.childNodes[0]);
+                }
+            }
+        };
+
+        const observeNewTextNodes = (state) => {
+            if (observersEnabled) {
+                return;
+            }
+
+            mutationObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList') {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.nodeType === Node.ELEMENT_NODE) {
+                                const textNodes = Array.from(node.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
+                                textNodes.forEach(textNode => censorTextNode(state, textNode));
+                            } else if (node.nodeType === Node.TEXT_NODE) {
+                                censorTextNode(state, node);
+                            }
+                        });
+                    }
+                });
+            });
+
+            if (document.body) {
+                mutationObserver.observe(document.body, {
+                    childList: true,
+                    subtree: true,
+                });
+                observersEnabled = true;
+            } else {
+                setTimeout(() => observeNewTextNodes(state), 100);
+            }
+        };
+
         const init = async () => {
             try {
                 const state = await loadSettings();
@@ -515,8 +608,10 @@ if (window !== window.top) {
                 if (state.censorEnabled) {
                     censorAllImages(state);
                     observeNewImages(state);
-                    censorBadWords(state); // Add this line
+                    censorBadWords(state);
+                    observeNewTextNodes(state);
                 }
+                // toggleLabels(state.showLabels);
             } catch (error) {
                 console.error('Error loading NSFWJS:', error);
             }
