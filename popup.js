@@ -6,7 +6,6 @@ const sendButton = document.querySelector('.send-button');
 const clearChatButton = document.getElementById('clearChatButton');
 const attachImageButton = document.getElementById('attachImageButton');
 const imageUpload = document.getElementById('imageUpload');
-const socket = io('http://localhost:3000');
 let typingInterval;
 // Function to load chat messages from storage
 function loadChatMessages() {
@@ -68,25 +67,6 @@ function clearChat() {
     chrome.storage.local.remove('chatMessages'); // Clear from storage
 }
 
-// Function to handle image selection
-function handleImageUpload(event) {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            // Send image data to server (and other clients)
-            socket.emit('chat message', {
-                text: chatInput.value, // Include any text message
-                imageData: e.target.result
-            });
-            addMessage('You sent an image', 'user', e.target.result); // Add to sender's UI
-            chatInput.value = ''; // Clear text input
-            saveChatMessages(); // Save messages after sending
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
 // Event listeners
 sendButton.addEventListener('click', () => {
     sendMessage();
@@ -100,7 +80,10 @@ sendButton.addEventListener('click', () => {
 clearChatButton.addEventListener('click', clearChat);
 
 // Receive message (including potential image data)
-socket.on('chat message', (data) => {
+function displayMessage(data) {
+    console.log("data", data)
+    const text = data.text;
+    const imgUrl = data.imageUrl;
     // Add the typing animation before displaying the message
     const messageElement = document.createElement('div');
     messageElement.classList.add('message', 'server');
@@ -124,20 +107,20 @@ socket.on('chat message', (data) => {
         // Get the last message element (which is the placeholder with typing animation)
         const lastMessageElement = chatMessages.lastElementChild;
         // Update the last message element with the actual message content
-        if (data.imgUrl) {
+        if (imgUrl) {
             const imageElement = document.createElement('img');
-            imageElement.src = data.imgUrl;
+            imageElement.src = imgUrl;
             imageElement.classList.add('image-preview');
             lastMessageElement.innerHTML = ''; // Clear the placeholder content
             lastMessageElement.appendChild(imageElement);
         } else {
-            lastMessageElement.textContent = data.text; // Update text content
+            lastMessageElement.textContent = text; // Update text content
         }
         chatMessages.scrollTop = chatMessages.scrollHeight;
         saveChatMessages(); // Save messages after receiving
     }, 700); // Adjust delay as needed
+}
 
-});
 
 // Adjust textarea height automatically
 chatInput.addEventListener('input', () => {
@@ -201,7 +184,7 @@ function sendMessage() {
 
 // Function to send the message to the server
 function sendMessageToServer(messageData) {
-    sendPayload(messageData);
+    chrome.runtime.sendMessage({ type: 'SEND_PAYLOAD', messageData: messageData });
     addMessage('You', 'user', messageData);
     startTypingAnimation();
     setTimeout(() => {
@@ -212,33 +195,6 @@ function sendMessageToServer(messageData) {
     //reset height 
 }
 
-async function sendPayload(messageData) {
-    try {
-        
-        const response = await fetch('http://localhost:3000/api/message', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-                // Add any other headers your API requires, like authorization
-            },
-            body: JSON.stringify(messageData)
-        });
-        stopTypingAnimation();
-        if (!response.ok) {
-            throw new Error(`API request failed with status ${response.status}`);
-        }
-
-    } catch (error) {
-        console.error('Error sending message:', error);
-        // Handle the error, e.g., display an error message to the user
-        // addMessage('Error sending message. Please try again later.', 'server');
-    } finally {
-        // Clear input fields
-        chatInput.value = '';
-        // imageUpload.value = '';
-    }
-
-}
 // Tab switching logic
 const tabs = document.querySelectorAll('.tab');
 const contentAreas = document.querySelectorAll('.content');
@@ -488,6 +444,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (chatInput) {
             chatInput.focus();
         }
+    }
+    if (message.type === 'DISPLAY_MESSAGE') {
+        console.log("should be here")
+        displayMessage(message.data);
     }
 });
 

@@ -17,11 +17,11 @@ if (window !== window.top) {
             strictMode: true,
         };
         const classNameMap = {
-            'Drawing': 'Drawing',
-            'Hentai': 'Hentai',
+            'Drawing': 'Neutral',
+            'Hentai': 'NSFW',
             'Neutral': 'Neutral',
-            'Porn': 'Porn',
-            'Sexy': 'Sexy'
+            'Porn': 'NSFW',
+            'Sexy': 'NSFW'
         };
         const loadSettings = () =>
             new Promise(resolve =>
