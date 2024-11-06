@@ -29,6 +29,7 @@ function addMessage(message, sender, messageData = null) {
     const messageElement = document.createElement('div');
     messageElement.classList.add('message', sender);
     chatMessages.appendChild(messageElement);
+    
 
     if (messageData) {
         if (messageData.text) {
@@ -37,22 +38,13 @@ function addMessage(message, sender, messageData = null) {
     } else {
         messageElement.textContent = message;
     }
+    saveChatMessages(); // Save messages after sending
     setTimeout(() => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }, 100);
 }
 
-// Function to save chat messages to storage
-function saveChatMessages() {
-    const messages = Array.from(chatMessages.children).map(messageElement => ({
-        text: messageElement.textContent,
-        sender: messageElement.classList.contains('user') ? 'user' : 'server',
-        imageData: messageElement.querySelector('img') ? messageElement.querySelector('img').src : null
-    }));
-    chrome.storage.local.set({
-        chatMessages: messages
-    });
-}
+
 
 // Function to clear chat messages
 function clearChat() {
@@ -83,7 +75,6 @@ function clearChat() {
 // Event listeners
 sendButton.addEventListener('click', () => {
     sendMessage();
-    saveChatMessages(); // Save messages after sending
 });
 
 // chatInput.addEventListener('keyup', (event) => {
@@ -130,7 +121,7 @@ function displayMessage(data) {
             lastMessageElement.textContent = text; // Update text content
         }
         chatMessages.scrollTop = chatMessages.scrollHeight;
-        saveChatMessages(); // Save messages after receiving
+        // saveChatMessages(); // Save messages after receiving
     }, 700); // Adjust delay as needed
 }
 
@@ -170,14 +161,23 @@ function sendMessage() {
     if (messageText !== "") {
         messageData.text = messageText;
     }
-
+    
     // Handle image upload (if any)
     sendMessageToServer(messageData);
 
     // Reset the input height after sending
 
 }
-
+// Function to save chat messages to storage
+function saveChatMessages() {
+    const messages = Array.from(chatMessages.children).map(messageElement => ({
+        text: messageElement.textContent,
+        sender: 'user',
+    }));
+    chrome.storage.local.set({
+        chatMessages: messages
+    });
+}
 // Function to send the message to the server
 function sendMessageToServer(messageData) {
     chrome.runtime.sendMessage({ type: 'sendPayload', messageData: messageData });

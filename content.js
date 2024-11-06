@@ -444,6 +444,13 @@ if (window !== window.top) {
                     } catch (error) {
                         console.error('Error in revealFocusedImage:', error);
                     }
+                } else if (message.action === 'DISPLAY_ALERT') {
+                    try {
+                        const alertMessage = message.data;
+                        console.log(alertMessage)
+                    } catch (error) {
+                        console.error('Error in revealFocusedImage:', error);
+                    }
                 }
             });
         };
