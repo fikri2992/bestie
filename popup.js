@@ -4,8 +4,7 @@ const chatInput = document.getElementById('main-chat-input');
 
 const sendButton = document.querySelector('.send-button');
 const clearChatButton = document.getElementById('clearChatButton');
-const attachImageButton = document.getElementById('attachImageButton');
-const imageUpload = document.getElementById('imageUpload');
+
 let typingInterval;
 // Function to load chat messages from storage
 function loadChatMessages() {
@@ -32,12 +31,6 @@ function addMessage(message, sender, messageData = null) {
     chatMessages.appendChild(messageElement);
 
     if (messageData) {
-        if (messageData.imageData) {
-            const imageElement = document.createElement('img');
-            imageElement.src = messageData.imageData;
-            imageElement.classList.add('image-preview');
-            messageElement.appendChild(imageElement);
-        }
         if (messageData.text) {
             messageElement.textContent = messageData.text;
         }
@@ -63,9 +56,29 @@ function saveChatMessages() {
 
 // Function to clear chat messages
 function clearChat() {
-    chatMessages.innerHTML = ''; // Clear chat messages from UI
-    chrome.storage.local.remove('chatMessages'); // Clear from storage
+    // Add a confirmation dialog to prevent accidental clearing
+    const confirmClear = confirm('Are you sure you want to clear the entire chat history? This action cannot be undone.');
+    
+    if (confirmClear) {
+        // Clear chat messages from UI
+        chatMessages.innerHTML = ''; 
+        
+        // Clear from storage
+        chrome.storage.local.remove('chatMessages', () => {
+            // Optional: Show a brief feedback to the user
+            const tempNotification = document.createElement('div');
+            tempNotification.textContent = 'Chat cleared successfully';
+            tempNotification.classList.add('notification');
+            document.body.appendChild(tempNotification);
+            
+            // Remove the notification after 2 seconds
+            setTimeout(() => {
+                document.body.removeChild(tempNotification);
+            }, 2000);
+        });
+    }
 }
+
 
 // Event listeners
 sendButton.addEventListener('click', () => {
@@ -151,13 +164,7 @@ function sendMessage() {
     const messageData = {}; // Start with an empty object
 
     // Determine message type
-    if (imageUpload?.files?.length > 0 && messageText !== "") {
-        messageData.type = 'text_image'; // Both text and image
-    } else if (imageUpload?.files?.length > 0) {
-        messageData.type = 'image'; // Image only
-    } else {
-        messageData.type = 'text'; // Text only
-    }
+    messageData.type = 'text'; // Text only
 
     // Add text content (if any)
     if (messageText !== "") {
@@ -165,18 +172,7 @@ function sendMessage() {
     }
 
     // Handle image upload (if any)
-    if (imageUpload?.files?.length > 0) {
-        const file = imageUpload.files[0];
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            messageData.imageData = e.target.result;
-            sendMessageToServer(messageData);
-        };
-        reader.readAsDataURL(file);
-    } else {
-        // Send text-only message immediately
-        sendMessageToServer(messageData);
-    }
+    sendMessageToServer(messageData);
 
     // Reset the input height after sending
 
@@ -184,7 +180,7 @@ function sendMessage() {
 
 // Function to send the message to the server
 function sendMessageToServer(messageData) {
-    chrome.runtime.sendMessage({ type: 'SEND_PAYLOAD', messageData: messageData });
+    chrome.runtime.sendMessage({ type: 'sendPayload', messageData: messageData });
     addMessage('You', 'user', messageData);
     startTypingAnimation();
     setTimeout(() => {
@@ -231,7 +227,7 @@ function initializeStrictModeToggle() {
 
     // Load the current state of the strictMode setting
     chrome.storage.local.get('strictMode', (result) => {
-        strictModeToggle.checked = result.strictMode === true;
+        strictModeToggle.checked = result.strictMode !== false;
     });
 
     strictModeToggle.addEventListener('change', function () {
@@ -292,6 +288,9 @@ function initializeCensorToggle() {
                     }
                 });
                 chrome.storage.local.set({ censorEnabled: censorToggle.checked });
+                console.log(`Censor ${action === 'enableCensor' ? 'enabled' : 'disabled'}`);
+                // send a message to background script to update the censor status to toggleEnabled
+                chrome.runtime.sendMessage({ type: 'toggleEnabled', status: censorToggle.checked });
             } else {
                 console.error('No active tab found');
             }

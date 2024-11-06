@@ -12,7 +12,7 @@ if (window !== window.top) {
     
         const defaultState = {
             censorEnabled: true,
-            blurIntensity: 40,
+            blurIntensity: 100,
             showLabels: true,
             strictMode: true,
         };
@@ -32,8 +32,8 @@ if (window !== window.top) {
                         revealedImages: result.revealedImages || {},
                         allowlist: result.allowlist || [],
                         badWords: result.badWords || [],
-                        showLabels: result.showLabels === true,
-                        strictMode: result.strictMode === true,
+                        showLabels: result.showLabels !== false,
+                        strictMode: result.strictMode !== false,
                     };
                     return resolve(finalResult);
                 })
@@ -105,7 +105,7 @@ if (window !== window.top) {
                 return element;
             }
     
-            const isLargeEnough = (element.offsetWidth >= 60 || element.offsetHeight >= 60) || (element.offsetWidth === 0 || element.offsetHeight === 0);
+            const isLargeEnough = (element.offsetWidth >= 128 || element.offsetHeight >= 128) || (element.offsetWidth === 0 || element.offsetHeight === 0);
             if (imageUrl === 'https://pbs.twimg.com/media/GbjIFf9b0AAE5hN?format=jpg&name=large') {
                 console.log("asdasdasd", state.censorEnabled,  state.revealedImages[FullUrl], element.dataset.censored, imageUrl, isLargeEnough)
             }
@@ -381,16 +381,68 @@ if (window !== window.top) {
                     // updateEnabledState(state);
                     // censorAllImages(state);
                 } else if (message.action === 'revealFocusedImage') {
-                    const focusedElement = document.activeElement;
-                    console.log('Focused element:', focusedElement);
-                    const images = focusedElement.querySelectorAll("img, div[style*='background-image']");
-                    if (images.length > 0) {
-                        images.forEach(element => {
-                            uncensorWithRevealImage(state, element.src);
-                        });
-                        
-                    } else {
-                        console.log('No images found in the focused element.');
+                    try {
+                        // Find all potential image containers near the last known mouse position
+                        console.log(window.lastMouseX, window.lastMouseY);
+                        const findImagesNearCursor = () => {
+                            if (typeof window.lastMouseX !== 'number' || typeof window.lastMouseY !== 'number') {
+                                console.warn('Invalid mouse coordinates');
+                                return [];
+                            }
+                            // Try multiple strategies to find images
+                            const strategies = [
+                                () => document.elementFromPoint(window.lastMouseX, window.lastMouseY),
+                                () => document.elementsFromPoint(window.lastMouseX, window.lastMouseY)[0],
+                                () => document.elementsFromPoint(window.lastMouseX, window.lastMouseY)[1]
+                            ];
+                
+                            for (const strategy of strategies) {
+                                const element = strategy();
+                                if (!element) continue;
+                
+                                // Search for images in the element and its ancestors
+                                const imageSearchPaths = [
+                                    element.querySelectorAll("img, div[style*='background-image']"),
+                                    element.closest('a')?.querySelectorAll("img, div[style*='background-image']"),
+                                    element.parentElement?.querySelectorAll("img, div[style*='background-image']")
+                                ];
+                
+                                for (const images of imageSearchPaths) {
+                                    if (images && images.length > 0) {
+                                        return Array.from(images);
+                                    }
+                                }
+                            }
+                
+                            return [];
+                        };
+                
+                        const imagesToReveal = findImagesNearCursor();
+                
+                        if (imagesToReveal.length > 0) {
+                            console.log(`Revealing ${imagesToReveal.length} image(s) near cursor`);
+                            
+                            imagesToReveal.forEach(element => {
+                                // Robust image source extraction
+                                let imageUrl = '';
+                                if (element.tagName === 'IMG') {
+                                    imageUrl = element.src || element.currentSrc;
+                                } else if (element.tagName === 'DIV') {
+                                    const backgroundImage = element.style.backgroundImage;
+                                    if (backgroundImage && backgroundImage.startsWith('url(')) {
+                                        imageUrl = backgroundImage.slice(4, -1).replace(/["']/g, '');
+                                    }
+                                }
+                
+                                if (imageUrl) {
+                                    uncensorWithRevealImage(state, imageUrl);
+                                }
+                            });
+                        } else {
+                            console.log('No images found near the cursor');
+                        }
+                    } catch (error) {
+                        console.error('Error in revealFocusedImage:', error);
                     }
                 }
             });
@@ -507,7 +559,7 @@ if (window !== window.top) {
                 } else  {
                     label.style.display = "none";
                 }
-                parentElement.appendChild(label)
+                if (parentElement) parentElement.appendChild(label)
             });
         }
     
@@ -520,7 +572,7 @@ if (window !== window.top) {
         }
         // Function to request image analysis
         function analyzeImage(img, state, imageUrl) {
-            const isLargeEnough = img.offsetWidth >= 60 || img.offsetHeight >= 60;
+            const isLargeEnough = img.offsetWidth >= 128 || img.offsetHeight >= 128;
             if (!isLargeEnough) return img;
             if (state.censorEnabled) {
                 // Send message to background script to analyze the image
@@ -567,7 +619,7 @@ if (window !== window.top) {
                 if (parentElement) removeExistingLabels(parentElement);
                 appendLabels(parentElement, labels, state);
             // }
-            console.log(state.strictMode)
+            // console.log(state.strictMode)
             if ((probabilities['Neutral'] > 0.8 || probabilities['Drawing'] > 0.8)) {
                 if (!state.strictMode) uncensorImage(state, element.src);
             }
@@ -622,15 +674,52 @@ if (window !== window.top) {
                 setTimeout(() => observeNewTextNodes(state), 100);
             }
         };
+        // Add this in the init function or near the top of the ImageCensor module
+        const initMouseTracking = () => {
+            // Ensure we're tracking mouse position globally
+            window.lastMouseX = null;
+            window.lastMouseY = null;
 
+            // Debounce function to limit the rate of mouse position updates
+            const debouncedMouseMove = debounce((event) => {
+                // Validate coordinates before setting
+                if (event.clientX != null && event.clientY != null) {
+                    window.lastMouseX = event.clientX;
+                    window.lastMouseY = event.clientY;
+                }
+            }, 200); // 50ms debounce time
+
+            document.addEventListener('mousemove', debouncedMouseMove);
+
+            // Fallback for scenarios where mousemove might not trigger
+            window.addEventListener('mouseenter', (event) => {
+                if (event.clientX != null && event.clientY != null) {
+                    window.lastMouseX = event.clientX;
+                    window.lastMouseY = event.clientY;
+                }
+            });
+        };
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
         const init = async () => {
             try {
                 const state = await loadSettings();
                 setupMessageListener(state);
+                // Add mouse tracking
+                initMouseTracking();
                 if (state.allowlist.some(url => window.location.href.includes(url))) {
                     return;
                 }
-    
+                
                 if (state.censorEnabled) {
                     censorAllImages(state);
                     observeNewImages(state);

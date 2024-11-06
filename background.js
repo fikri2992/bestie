@@ -1,6 +1,16 @@
 // background.js
 chrome.runtime.onInstalled.addListener(() => {
     console.log("NSFWJS Extension installed.");
+    chrome.storage.local.get(['censorEnabled'], (result) => {
+        const iconPath = result.censorEnabled ? 'icons/active.png' : 'icons/inactive.png';
+        // Use chrome.runtime.getURL to get the full extension URL
+        const fullIconPath = chrome.runtime.getURL(iconPath);
+        chrome.action.setIcon({ 
+            path: {
+                128: fullIconPath
+            }
+        });
+    });
     ensureOffscreenDocument().then(() => {
         // Forward the message to the offscreen document
         loadModelInOffscreen();
@@ -76,16 +86,16 @@ async function ensureOffscreenDocument() {
   // Listen for messages from the content script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.type === 'ANALYZE_IMAGE') {
-            // Forward the message to the offscreen document
-            chrome.runtime.sendMessage(message, async (response) => {
-                // Send the response back to the content script
-                await sendResponse(response);
+            ensureOffscreenDocument().then(() => {
+                // Forward the message to the offscreen document
+                // Forward the message to the offscreen document
+                chrome.runtime.sendMessage(message, async (response) => {
+                    // Send the response back to the content script
+                    await sendResponse(response);
+                });
             });
-
-            // Return true to indicate async response
             return true;
         }
-
         if (message.action === 'captureScreenshot') {
             chrome.tabs.captureVisibleTab(null, { format: 'jpeg', quality: 100 }, (screenshotUrl) => {
                 sendResponse(screenshotUrl);
@@ -166,8 +176,21 @@ async function ensureOffscreenDocument() {
             });
             return true;
         }
-        if (message.type === 'SEND_PAYLOAD') {
+        if (message.type === 'sendPayload') {
             sendPayload(message.messageData);
+        }
+        if (message.type === 'toggleEnabled') {
+            // chrome.storage.local.get(['censorEnabled'], (result) => {
+                console.log(message.status)
+                const iconPath = message.status ? 'icons/active.png' : 'icons/inactive.png';
+                // Use chrome.runtime.getURL to get the full extension URL
+                const fullIconPath = chrome.runtime.getURL(iconPath);
+                chrome.action.setIcon({ 
+                    path: {
+                        128: fullIconPath
+                    }
+                });
+            // });
         }
     });
 function base64ToBlob(base64, mimeType) {
@@ -311,6 +334,7 @@ chrome.commands.onCommand.addListener((command) => {
         chrome.runtime.sendMessage({ action: 'focusChatInput' });
     }
     if (command === "toggle_image_censor") {
+        console.log("Asdasdasdasdas")
         chrome.storage.local.get(['censorEnabled'], (result) => {
             const newCensorState = !result.censorEnabled;
             chrome.storage.local.set({ censorEnabled: newCensorState }, () => {
@@ -318,6 +342,17 @@ chrome.commands.onCommand.addListener((command) => {
                     if (tabs[0]) {
                         const action = newCensorState ? 'enableCensor' : 'disableCensor';
                         chrome.tabs.sendMessage(tabs[0].id, { action: action });
+                    }
+                });
+
+                // Update extension icon with multiple sizes
+                const iconPath = newCensorState ? 'icons/active.png' : 'icons/inactive.png';
+                // Use chrome.runtime.getURL to get the full extension URL
+                const fullIconPath = chrome.runtime.getURL(iconPath);
+                console.log(fullIconPath)
+                chrome.action.setIcon({ 
+                    path: {
+                        128: fullIconPath
                     }
                 });
             });

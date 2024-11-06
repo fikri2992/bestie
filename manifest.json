@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "My Chat Extension",
+    "name": "Bestie",
     "version": "1.0",
-    "description": "A simple chat extension",
+    "description": "your bestie but as a chrome extension",
     "permissions": [
         "offscreen",
         "scripting",
@@ -52,5 +52,8 @@
             },
             "description": "Reveal the focused image"
         }
+    },
+    "icons": {
+        "128": "icons/active.png"
     }
 }
