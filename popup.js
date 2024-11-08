@@ -1,7 +1,6 @@
 // Get DOM elements
 const chatMessages = document.querySelector('.chat-messages');
 const chatInput = document.getElementById('main-chat-input');
-
 const sendButton = document.querySelector('.send-button');
 const clearChatButton = document.getElementById('clearChatButton');
 
@@ -29,6 +28,7 @@ function addMessage(message, sender, messageData = null) {
     const messageElement = document.createElement('div');
     messageElement.classList.add('message', sender);
     chatMessages.appendChild(messageElement);
+    saveChatMessages(); // Save messages after sending
     
 
     if (messageData) {
@@ -38,7 +38,6 @@ function addMessage(message, sender, messageData = null) {
     } else {
         messageElement.textContent = message;
     }
-    saveChatMessages(); // Save messages after sending
     setTimeout(() => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }, 100);
@@ -132,22 +131,7 @@ chatInput.addEventListener('input', () => {
     chatInput.style.height = chatInput.scrollHeight + 'px';
 });
 
-// Handle keydown events
-chatInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && chatInput.value) {
-        if (!e.shiftKey) {
-            // Prevent default behavior
-            e.preventDefault();
-            // Trigger send message function
-            sendMessage();
-            // Clear the input
-            chatInput.value = '';
-            // Reset the height
-            chatInput.style.height = 'auto';
-        }
-        // If Shift+Enter, allow the newline (default behavior)
-    }
-});
+
 
 // Function to send the message
 function sendMessage() {
@@ -172,7 +156,7 @@ function sendMessage() {
 function saveChatMessages() {
     const messages = Array.from(chatMessages.children).map(messageElement => ({
         text: messageElement.textContent,
-        sender: 'user',
+        sender: messageElement.classList.contains('user') ? 'user' : 'server',
     }));
     chrome.storage.local.set({
         chatMessages: messages
@@ -247,6 +231,22 @@ document.addEventListener('DOMContentLoaded', function () {
     loadAllowlist();
     loadBadWords();
     toggleLabel();
+    // Handle keydown events
+    chatInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && chatInput.value) {
+            if (!e.shiftKey) {
+                // Prevent default behavior
+                e.preventDefault();
+                // Trigger send message function
+                sendMessage();
+                // Clear the input
+                chatInput.value = '';
+                // Reset the height
+                chatInput.style.height = 'auto';
+            }
+            // If Shift+Enter, allow the newline (default behavior)
+        }
+    });
 });
 
 function toggleLabel() {
@@ -339,20 +339,6 @@ function checkUserProfile() {
 
 // Get the "Clear All Data" button element
 const clearAllDataButton = document.getElementById('clearAllDataButton');
-
-// Add event listener to the "Clear All Data" button
-clearAllDataButton.addEventListener('click', () => {
-    // Show a confirmation dialog
-    const confirmClear = confirm('Are you sure you want to clear all data? This action cannot be undone.');
-    
-    if (confirmClear) {
-        // Clear all data from local storage
-        chrome.storage.local.clear(() => {
-            // Reload the extension popup
-            location.reload();
-        });
-    }
-});
 
 // Function to save allowlist
 function saveAllowlist() {

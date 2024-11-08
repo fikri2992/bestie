@@ -46,6 +46,12 @@
             },
             "description": "Toggle Image Censor"
         },
+        "toggle_label_censor": {
+            "suggested_key": {
+                "default": "Alt+Shift+L"
+            },
+            "description": "Toggle Image Label Censor"
+        },
         "reveal_focused_image": {
             "suggested_key": {
                 "default": "Ctrl+Shift+S"

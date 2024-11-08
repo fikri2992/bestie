@@ -580,3 +580,29 @@ input:checked+.slider:before {
     max-height: 150px;
     overflow: auto;
 }
+
+/* Tooltip styles */
+[title] {
+    position: relative;
+    cursor: help;
+}
+
+[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 10px;
+    background-color: #333;
+    color: #fff;
+    font-size: 12px;
+    white-space: nowrap;
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+[title]:hover::after {
+    opacity: 1;
+}

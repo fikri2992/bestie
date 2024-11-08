@@ -19,32 +19,25 @@ chrome.runtime.onInstalled.addListener(() => {
         //     await sendResponse(response);
         // });
     });
-});
+    chrome.contextMenus.create({
+        id: "revealImage",
+        title: "Reveal Image",
+        contexts: ["image"]
+    });
 
-chrome.contextMenus.create({
-    id: "revealImage",
-    title: "Reveal Image",
-    contexts: ["image"]
-});
+    chrome.contextMenus.create({
+        id: "askBestieAboutImage",
+        title: "Ask Bestie about this image",
+        contexts: ["image"]
+    });
 
-chrome.contextMenus.create({
-    id: "askBestieAboutImage",
-    title: "Ask Bestie about this image",
-    contexts: ["image"]
+    // Add a context menu item for selected text
+    chrome.contextMenus.create({
+        id: "askBestieAboutText",
+        title: "Ask Bestie about this text",
+        contexts: ["selection"]
+    });
 });
-
-// Add a context menu item for selected text
-chrome.contextMenus.create({
-    id: "askBestieAboutText",
-    title: "Ask Bestie about this text",
-    contexts: ["selection"]
-});
-// chrome.contextMenus.create({
-//     id: "bestieThinking",
-//     title: "Bestie Thinking",
-//     contexts: ["all"]
-// });
-
 
 
 chrome.contextMenus.onClicked.addListener(function (info, tab) {
@@ -269,6 +262,7 @@ async function handleAskImageBestie(message) {
         }
 
         const data = await response.json();
+        data.sender = "server";
         // Save message and handle popup
         saveChatMessage(data, () => {
             ensurePopupOpen();
@@ -313,6 +307,7 @@ async function handleAskTextBestie(selectedText, screenshotBlob) {
         }
 
         const data = await response.json();
+        data.sender = "server";
         // Save message and handle popup
         saveChatMessage(data, () => {
             ensurePopupOpen();
@@ -338,96 +333,61 @@ async function handleAskTextBestie(selectedText, screenshotBlob) {
 }
 
 
-async function handleBestieThinking(screenshotBlob, pageText, currentUrl) {
-    try {
-        const formData = new FormData();
-        formData.append('screenshot', screenshotBlob, 'screenshot.jpg');
-        formData.append('context', JSON.stringify({
-            text: pageText,
-            currentUrl
-        }));
-        chrome.runtime.sendMessage({
-            type: 'LOADING_CHAT_START'
-        });
-
-        const response = await fetch('http://localhost:3000/thinking', {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!response.ok) {
-            throw new Error(`API request failed with status ${response.status}`);
-        }
-
-        const data = await response.json();
-        // Save message and handle popup
-        saveChatMessage(data, () => {
-            ensurePopupOpen();
-
-            chrome.runtime.sendMessage({
-                type: 'LOADING_CHAT_END'
-            });
-            chrome.runtime.sendMessage({
-                type: 'DISPLAY_MESSAGE',
-                data
-            });
-        });
-    } catch (error) {
-        console.error('Error in Bestie Thinking:', error);
-        chrome.runtime.sendMessage({
-            type: 'LOADING_CHAT_END'
-        });
-        chrome.runtime.sendMessage({
-            type: 'DISPLAY_ERROR',
-            error: error.message
-        });
-    }
-}
 
 async function sendPayload(messageData) {
     try {
-        const response = await fetch('http://localhost:3000/api/message', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(messageData)
-        });
+        // Retrieve chat history from local storage
+        chrome.storage.local.get(['chatHistory'], async (result) => {
+            const chatHistory = result.chatHistory || [];
 
-        if (response.ok) {
-            const data = await response.json();
+            // Add chatHistory to the request body
+            const requestBody = {
+                ...messageData,
+                history: chatHistory,
+            };
 
-            // Save message and handle popup
-            saveChatMessage(data, () => {
-                ensurePopupOpen();
-
-                chrome.runtime.sendMessage({
-                    type: 'LOADING_CHAT_END'
-                });
-                chrome.runtime.sendMessage({
-                    type: 'DISPLAY_MESSAGE',
-                    data
-                });
-
+            const response = await fetch('http://localhost:3000/api/message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
             });
-            
-        } else {
-            throw new Error(`API request failed with status ${response.status}`);
-        }
+
+            if (response.ok) {
+                const data = await response.json();
+                data.sender = "server";
+                // Save message and handle popup
+                saveChatMessage(data, () => {
+                    ensurePopupOpen();
+
+                    chrome.runtime.sendMessage({
+                        type: 'LOADING_CHAT_END'
+                    });
+                    chrome.runtime.sendMessage({
+                        type: 'DISPLAY_MESSAGE',
+                        data
+                    });
+                });
+            } else {
+                throw new Error(`API request failed with status ${response.status}`);
+            }
+        });
     } catch (error) {
         console.error('Error sending message:', error);
     }
 }
 
+
 // Separate function for saving chat messages
 function saveChatMessage(message, callback = () => {}) {
     chrome.storage.local.get(['chatMessages'], (result) => {
         const existingMessages = result.chatMessages || [];
-        
+        console.log("Saving message:", existingMessages);
         // Ensure the message has a 'server' sender
         const formattedMessage = {
             text: message.text || message.data,
-            sender: 'server'
+            sender: message.sender || 'server',
         };
 
         const updatedMessages = [...existingMessages, formattedMessage];
@@ -435,11 +395,33 @@ function saveChatMessage(message, callback = () => {}) {
         chrome.storage.local.set({
             chatMessages: updatedMessages
         }, () => {
-            callback(updatedMessages);
+            // Save chat history to local storage
+            saveChatHistory(message, () => {
+                callback(updatedMessages);
+            });
         });
     });
 }
 
+// Function to save chat history
+function saveChatHistory(callback = () => {}) {
+    chrome.storage.local.get(['chatMessages'], (result) => {
+        const chatMessages = result.chatMessages || [];
+
+        const chatHistory = chatMessages.map((message) => ({
+            role: message.sender === 'server' ? 'model' : 'user',
+            parts: [
+                {
+                    text: message.text,
+                },
+            ],
+        }));
+
+        chrome.storage.local.set({
+            chatHistory: chatHistory
+        }, callback);
+    });
+}
 
 // Function to ensure popup is open
 function ensurePopupOpen() {
@@ -495,7 +477,6 @@ chrome.commands.onCommand.addListener((command) => {
         });
     }
     if (command === "toggle_image_censor") {
-        console.log("Asdasdasdasdas")
         chrome.storage.local.get(['censorEnabled'], (result) => {
             const newCensorState = !result.censorEnabled;
             chrome.storage.local.set({
@@ -536,6 +517,27 @@ chrome.commands.onCommand.addListener((command) => {
                     action: 'revealFocusedImage'
                 });
             }
+        });
+    }
+    if (command === "toggle_label_censor") {
+        console.log("Toggle Label Censor command received");
+        chrome.storage.local.get(['showLabels'], (result) => {
+            const newLabelState = !result.showLabels;
+            chrome.storage.local.set({
+                showLabels: newLabelState
+            }, () => {
+                chrome.tabs.query({
+                    active: true,
+                    currentWindow: true
+                }, (tabs) => {
+                    if (tabs[0]) {
+                        chrome.tabs.sendMessage(tabs[0].id, {
+                            action: 'toggleShowLabels',
+                            showLabels: newLabelState
+                        });
+                    }
+                });
+            });
         });
     }
 });
