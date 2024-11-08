@@ -202,6 +202,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === 'sendPayload') {
         sendPayload(message.messageData);
+        return true; // Required to use sendResponse asynchronously
     }
     if (message.type === 'toggleEnabled') {
         // chrome.storage.local.get(['censorEnabled'], (result) => {
@@ -336,6 +337,7 @@ async function handleAskTextBestie(selectedText, screenshotBlob) {
 
 async function sendPayload(messageData) {
     try {
+        console.log("Sending payload:", messageData);
         // Retrieve chat history from local storage
         chrome.storage.local.get(['chatHistory'], async (result) => {
             const chatHistory = result.chatHistory || [];
@@ -357,17 +359,18 @@ async function sendPayload(messageData) {
             if (response.ok) {
                 const data = await response.json();
                 data.sender = "server";
+                console.log("asdas ", data)
                 // Save message and handle popup
+                ensurePopupOpen();
+                console.log("message saved", data);
+                chrome.runtime.sendMessage({
+                    type: 'LOADING_CHAT_END'
+                });
+                chrome.runtime.sendMessage({
+                    type: 'DISPLAY_MESSAGE',
+                    data
+                });
                 saveChatMessage(data, () => {
-                    ensurePopupOpen();
-
-                    chrome.runtime.sendMessage({
-                        type: 'LOADING_CHAT_END'
-                    });
-                    chrome.runtime.sendMessage({
-                        type: 'DISPLAY_MESSAGE',
-                        data
-                    });
                 });
             } else {
                 throw new Error(`API request failed with status ${response.status}`);
@@ -404,25 +407,26 @@ function saveChatMessage(message, callback = () => {}) {
 }
 
 // Function to save chat history
-function saveChatHistory(callback = () => {}) {
+function saveChatHistory(callback) { // No default value here
     chrome.storage.local.get(['chatMessages'], (result) => {
         const chatMessages = result.chatMessages || [];
 
-        const chatHistory = chatMessages.map((message) => ({
-            role: message.sender === 'server' ? 'model' : 'user',
-            parts: [
-                {
-                    text: message.text,
-                },
-            ],
-        }));
+        const chatHistory = chatMessages.map((message) => {
+            return JSON.parse(JSON.stringify({ // Create plain objects
+                role: message.sender === 'server' ? 'model' : 'user',
+                parts: [{ text: String(message.text || '') }],
+            }));
+        });
 
-        chrome.storage.local.set({
-            chatHistory: chatHistory
-        }, callback);
+        console.log("Saving chat history:", chatHistory, typeof chatHistory);
+        chrome.storage.local.set({ chatHistory: chatHistory }, () => {
+            console.log("Chat history saved");
+            if (typeof callback === 'function') { // Check if callback is a function
+                callback();
+            }
+        });
     });
 }
-
 // Function to ensure popup is open
 function ensurePopupOpen() {
     chrome.windows.getAll({
