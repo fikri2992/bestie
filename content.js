@@ -44,10 +44,13 @@ if (window !== window.top) {
                 if (!url || url.startsWith('--') || url.startsWith('chrome-extension://')) {
                     return null;
                 }
-                if (url.startsWith('data:')) {
+                if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
                     return url;
                 }
-                return url;
+                // If the URL is relative, construct the full URL
+                const a = document.createElement('a');
+                a.href = url;
+                return a.href;
             } catch (error) {
                 console.error('Invalid URL:', url, error);
                 return null;
@@ -202,7 +205,7 @@ if (window !== window.top) {
                 }
             });
     
-            updateRevealedImages(state);
+            // updateRevealedImages(state);
         };
     
         const observeNewImages = (state) => {
@@ -300,6 +303,19 @@ if (window !== window.top) {
                 label.style.display = show ? 'block' : 'none';
             });
         };
+
+        const blurSpecificImage = (state, imageUrl) => {
+            const fullUrl = getFullUrl(imageUrl);
+            const elements = Array.from(document.querySelectorAll(`img[src*="${fullUrl}"], div[style*="${fullUrl}"]`));
+            state.revealedImages[fullUrl] = false
+            elements.forEach(element => {
+                // Check if the element is already blurred
+                if (!element.dataset.censored) {
+                    console.log(element)
+                    blurElement(state)(element);
+                }
+            });
+        }
         const updateEnabledState = newState =>
             new Promise(resolve =>
                 chrome.storage.local.set({
@@ -326,6 +342,7 @@ if (window !== window.top) {
                         censorEnabled: false,
                     };
                     updateEnabledState(newState).then(() => {
+                        state.revealedImages = [];
                         removeAllCensors(newState); // Remove censor from all images
                         disableObservers(); // Disable observers when censoring is disabled
                     });
@@ -444,6 +461,8 @@ if (window !== window.top) {
                     } catch (error) {
                         console.error('Error in revealFocusedImage:', error);
                     }
+                } else if (message.action === 'blurFocusedImage') {
+                    blurFocusedImage(state);
                 } else if (message.action === 'DISPLAY_ALERT') {
                     try {
                         const alertMessage = message.data;
@@ -451,14 +470,78 @@ if (window !== window.top) {
                     } catch (error) {
                         console.error('Error in revealFocusedImage:', error);
                     }
+                } else if (message.action === "blurImage") {
+                    // New action to blur a specific image
+                    blurSpecificImage(state, message.srcUrl);
                 }
             });
         };
+        // Add this function to handle the blurFocusedImage action
+        function blurFocusedImage(state) {
+            try {
+                const findImagesNearCursor = () => {
+                    if (typeof window.lastMouseX !== 'number' || typeof window.lastMouseY !== 'number') {
+                        console.warn('Invalid mouse coordinates');
+                        return [];
+                    }
+                    const strategies = [
+                        () => document.elementFromPoint(window.lastMouseX, window.lastMouseY),
+                        () => document.elementsFromPoint(window.lastMouseX, window.lastMouseY)[0],
+                        () => document.elementsFromPoint(window.lastMouseX, window.lastMouseY)[1]
+                    ];
+
+                    for (const strategy of strategies) {
+                        const element = strategy();
+                        if (!element) continue;
+
+                        const imageSearchPaths = [
+                            element.querySelectorAll("img, div[style*='background-image']"),
+                            element.closest('a')?.querySelectorAll("img, div[style*='background-image']"),
+                            element.parentElement?.querySelectorAll("img, div[style*='background-image']")
+                        ];
+
+                        for (const images of imageSearchPaths) {
+                            if (images && images.length > 0) {
+                                return Array.from(images);
+                            }
+                        }
+                    }
+
+                    return [];
+                };
+
+                const imagesToBlur = findImagesNearCursor();
+
+                if (imagesToBlur.length > 0) {
+                    console.log(`Blurring ${imagesToBlur.length} image(s) near cursor`);
+
+                    imagesToBlur.forEach(element => {
+                        let imageUrl = '';
+                        if (element.tagName === 'IMG') {
+                            imageUrl = element.src || element.currentSrc;
+                        } else if (element.tagName === 'DIV') {
+                            const backgroundImage = element.style.backgroundImage;
+                            if (backgroundImage && backgroundImage.startsWith('url(')) {
+                                imageUrl = backgroundImage.slice(4, -1).replace(/["']/g, '');
+                            }
+                        }
+
+                        if (imageUrl) {
+                            blurSpecificImage(state, imageUrl);
+                        }
+                    });
+                } else {
+                    console.log('No images found near the cursor');
+                }
+            } catch (error) {
+                console.error('Error in blurFocusedImage:', error);
+            }
+        }
         async function askBestieAboutImage(state, imageUrl) {
             try {
                 console.log('Asking Bestie about image:', imageUrl);
                 const [imageResponse, screenshotBlob] = await Promise.all([
-                    fetch(imageUrl, { mode: 'cors' }),
+                    fetch(imageUrl, { mode: 'cors',  credentials: 'include' }),
                     captureScreenshot()
                 ]);
                 const imageBlob = await imageResponse.blob();

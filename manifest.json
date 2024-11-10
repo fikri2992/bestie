@@ -4,6 +4,7 @@
     "version": "1.0",
     "description": "your bestie but as a chrome extension",
     "permissions": [
+        "webRequest",
         "offscreen",
         "scripting",
         "storage",
@@ -46,11 +47,11 @@
             },
             "description": "Toggle Image Censor"
         },
-        "toggle_label_censor": {
+        "blur_focused_image": {
             "suggested_key": {
-                "default": "Alt+Shift+L"
+                "default": "Ctrl+Shift+Q"
             },
-            "description": "Toggle Image Label Censor"
+            "description": "Blur the focused image"
         },
         "reveal_focused_image": {
             "suggested_key": {

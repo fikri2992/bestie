@@ -1,16 +1,15 @@
 // background.js
 chrome.runtime.onInstalled.addListener(() => {
     console.log("NSFWJS Extension installed.");
-    chrome.storage.local.get(['censorEnabled'], (result) => {
-        const iconPath = result.censorEnabled ? 'icons/active.png' : 'icons/inactive.png';
-        // Use chrome.runtime.getURL to get the full extension URL
-        const fullIconPath = chrome.runtime.getURL(iconPath);
-        chrome.action.setIcon({
-            path: {
-                128: fullIconPath
-            }
-        });
+    const iconPath = 'icons/active.png'
+    // Use chrome.runtime.getURL to get the full extension URL
+    const fullIconPath = chrome.runtime.getURL(iconPath);
+    chrome.action.setIcon({
+        path: {
+            128: fullIconPath
+        }
     });
+    
     ensureOffscreenDocument().then(() => {
         // Forward the message to the offscreen document
         loadModelInOffscreen();
@@ -24,7 +23,11 @@ chrome.runtime.onInstalled.addListener(() => {
         title: "Reveal Image",
         contexts: ["image"]
     });
-
+    chrome.contextMenus.create({
+        id: "blurImage",
+        title: "Blur Image",
+        contexts: ["image"]
+    });
     chrome.contextMenus.create({
         id: "askBestieAboutImage",
         title: "Ask Bestie about this image",
@@ -62,6 +65,12 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
         chrome.tabs.sendMessage(tab.id, {
             action: 'bestieThinking'
         });
+    }  else if (info.menuItemId === "blurImage") {
+        // Send a message to the content script to blur the image
+        chrome.tabs.sendMessage(tab.id, {
+            action: 'blurImage',
+            srcUrl: info.srcUrl
+        });
     }
 });
 
@@ -78,6 +87,18 @@ async function ensureOffscreenDocument() {
 }
 // Listen for messages from the content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'fetchImage') {
+        fetchImage(message.imageUrl)
+            .then(imageBlob => {
+                sendResponse({ success: true, imageBlob: imageBlob });
+            })
+            .catch(error => {
+                console.error('Error fetching image:', error);
+                sendResponse({ success: false, error: error.message });
+            });
+        return true; // Required to use sendResponse asynchronously
+    }
+    
     if (message.type === 'ANALYZE_IMAGE') {
         ensureOffscreenDocument().then(() => {
             // Forward the message to the offscreen document
@@ -246,6 +267,13 @@ async function handleAskImageBestie(message) {
             screenshotBlob
         } = message;
         chrome.runtime.sendMessage({
+            type: 'ADD_USER_MESSAGE', 
+            data: {
+                text: 'hi bestie, can you check this image for me?',
+                sender: 'user'
+            }
+        });
+        chrome.runtime.sendMessage({
             type: 'LOADING_CHAT_START'
         });
 
@@ -264,17 +292,17 @@ async function handleAskImageBestie(message) {
 
         const data = await response.json();
         data.sender = "server";
+        ensurePopupOpen();
+
+        chrome.runtime.sendMessage({
+            type: 'LOADING_CHAT_END'
+        });
+        chrome.runtime.sendMessage({
+            type: 'DISPLAY_MESSAGE',
+            data
+        });
         // Save message and handle popup
         saveChatMessage(data, () => {
-            ensurePopupOpen();
-
-            chrome.runtime.sendMessage({
-                type: 'LOADING_CHAT_END'
-            });
-            chrome.runtime.sendMessage({
-                type: 'DISPLAY_MESSAGE',
-                data
-            });
         });
     } catch (error) {
         console.error('Error asking Bestie about image:', error);
@@ -295,6 +323,13 @@ async function handleAskTextBestie(selectedText, screenshotBlob) {
         formData.append('text', selectedText);
         formData.append('screenshot', screenshotBlob, 'screenshot.jpg');
         chrome.runtime.sendMessage({
+            type: 'ADD_USER_MESSAGE', 
+            data: {
+                text: `hi bestie, can you check this "${selectedText}" for me?`,
+                sender: 'user'
+            }
+        });
+        chrome.runtime.sendMessage({
             type: 'LOADING_CHAT_START'
         });
 
@@ -310,16 +345,16 @@ async function handleAskTextBestie(selectedText, screenshotBlob) {
         const data = await response.json();
         data.sender = "server";
         // Save message and handle popup
-        saveChatMessage(data, () => {
-            ensurePopupOpen();
+        ensurePopupOpen();
 
-            chrome.runtime.sendMessage({
-                type: 'LOADING_CHAT_END'
-            });
-            chrome.runtime.sendMessage({
-                type: 'DISPLAY_MESSAGE',
-                data
-            });
+        chrome.runtime.sendMessage({
+            type: 'LOADING_CHAT_END'
+        });
+        chrome.runtime.sendMessage({
+            type: 'DISPLAY_MESSAGE',
+            data
+        });
+        saveChatMessage(data, () => {
         });
     } catch (error) {
         console.error('Error asking Bestie about text:', error);
@@ -420,8 +455,9 @@ function saveChatHistory(callback) { // No default value here
 
         console.log("Saving chat history:", chatHistory, typeof chatHistory);
         chrome.storage.local.set({ chatHistory: chatHistory }, () => {
-            console.log("Chat history saved");
+            console.log("Chat history saved", callback);
             if (typeof callback === 'function') { // Check if callback is a function
+                console.log(callback)
                 callback();
             }
         });
@@ -456,7 +492,20 @@ function clearChatMessages(callback = () => {}) {
         chatMessages: []
     }, callback);
 }
-
+async function fetchImage(url) {
+    try {
+        console.log(url)
+        const response = await fetch(url, { credentials: 'include' });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const blob = await response.blob();
+        return blob;
+    } catch (error) {
+        console.error('Error fetching image:', error);
+        throw error;
+    }
+}
 
 chrome.commands.onCommand.addListener((command) => {
     if (command === "open_popup") {
@@ -502,7 +551,6 @@ chrome.commands.onCommand.addListener((command) => {
                 const iconPath = newCensorState ? 'icons/active.png' : 'icons/inactive.png';
                 // Use chrome.runtime.getURL to get the full extension URL
                 const fullIconPath = chrome.runtime.getURL(iconPath);
-                console.log(fullIconPath)
                 chrome.action.setIcon({
                     path: {
                         128: fullIconPath
@@ -512,6 +560,7 @@ chrome.commands.onCommand.addListener((command) => {
         });
     }
     if (command === "reveal_focused_image") {
+        console.log("Reveal focused image command received");
         chrome.tabs.query({
             active: true,
             currentWindow: true
@@ -519,6 +568,19 @@ chrome.commands.onCommand.addListener((command) => {
             if (tabs[0]) {
                 chrome.tabs.sendMessage(tabs[0].id, {
                     action: 'revealFocusedImage'
+                });
+            }
+        });
+    }
+    if (command === "blur_focused_image") {
+        console.log("Blur focused image command received");
+        chrome.tabs.query({
+            active: true,
+            currentWindow: true
+        }, (tabs) => {
+            if (tabs[0]) {
+                chrome.tabs.sendMessage(tabs[0].id, {
+                    action: 'blurFocusedImage'
                 });
             }
         });

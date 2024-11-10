@@ -2,7 +2,6 @@
 console.log('Popup script loaded');
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log('Received messagesasdas:', message);
     if (message.type === 'LOADING_CHAT_START') {
         startTypingAnimation();
     }
@@ -18,6 +17,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'DISPLAY_MESSAGE') {
         console.log('Received message:', message);
         displayMessage(message.data);
+    }
+    if (message.type === 'ADD_USER_MESSAGE') {
+        console.log('ADD_USER_MESSAGE Received message:', message);
+        addMessage(message.data.text, 'user');
+        // displayMessage(message.data);
     }
 });
 
@@ -83,7 +87,7 @@ function clearChat() {
     
     if (confirmClear) {
         chatMessages.innerHTML = ''; // Clear chat messages from UI
-        chrome.storage.local.remove('chatMessages', () => {
+        chrome.storage.local.remove(['chatMessages', 'chatHistory'], () => {
             // Show feedback to the user
             const tempNotification = document.createElement('div');
             tempNotification.textContent = 'Chat cleared successfully';
@@ -108,6 +112,8 @@ clearChatButton.addEventListener('click', clearChat);
 // Function to display a received message
 function displayMessage(data) {
     console.log('Received message:', data);
+    //console log chatHistory from local storage
+    console.log('chatHistory:', chrome.storage.local.get(['chatHistory']));
     const text = data.text;
     const imgUrl = data.imageUrl;
     const messageElement = document.createElement('div');
@@ -249,7 +255,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeStrictModeToggle(); // Add this line
     checkUserProfile();
     loadAllowlist();
-    loadBadWords();
+    // loadBadWords();
     toggleLabel();
 
     // Handle keydown events for chat input
@@ -349,17 +355,17 @@ function checkUserProfile() {
     });
 }
 
-// Event listener for "Clear All Data" button
-const clearAllDataButton = document.getElementById('clearAllDataButton');
-clearAllDataButton.addEventListener('click', () => {
-    const confirmClear = confirm('Are you sure you want to clear all data? This action cannot be undone.');
+// // Event listener for "Clear All Data" button
+// const clearAllDataButton = document.getElementById('clearAllDataButton');
+// clearAllDataButton.addEventListener('click', () => {
+//     const confirmClear = confirm('Are you sure you want to clear all data? This action cannot be undone.');
     
-    if (confirmClear) {
-        chrome.storage.local.clear(() => {
-            location.reload(); // Reload the extension popup
-        });
-    }
-});
+//     if (confirmClear) {
+//         chrome.storage.local.clear(() => {
+//             location.reload(); // Reload the extension popup
+//         });
+//     }
+// });
 
 // Function to save allowlist
 function saveAllowlist() {
@@ -391,17 +397,17 @@ function saveBadWords() {
     });
 }
 
-// Function to load bad words
-function loadBadWords() {
-    chrome.storage.local.get(['badWords'], (result) => {
-        const badWordsTextarea = document.getElementById('badWordsTextarea');
-        badWordsTextarea.value = result.badWords ? result.badWords.join('\n') : '';
-    });
-}
+// // Function to load bad words
+// function loadBadWords() {
+//     chrome.storage.local.get(['badWords'], (result) => {
+//         const badWordsTextarea = document.getElementById('badWordsTextarea');
+//         badWordsTextarea.value = result.badWords ? result.badWords.join('\n') : '';
+//     });
+// }
 
-// Event listener for saving bad words
-const saveBadWordsButton = document.getElementById('saveBadWordsButton');
-saveBadWordsButton.addEventListener('click', saveBadWords);
+// // Event listener for saving bad words
+// const saveBadWordsButton = document.getElementById('saveBadWordsButton');
+// saveBadWordsButton.addEventListener('click', saveBadWords);
 
 // Function to start the typing animation
 function startTypingAnimation() {
