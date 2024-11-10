@@ -322,36 +322,30 @@ function initializeCensorToggle() {
 
 // Check if user profile exists and display appropriate interface
 function checkUserProfile() {
-    chrome.storage.local.get(['displayName', 'age'], (result) => {
-        const chatInterface = document.getElementById('chatInterface');
-        const profileForm = document.getElementById('profileForm');
+    // Handle form submission
+    const submitButton = document.getElementById('submitProfile');
 
-        if (result.displayName && result.age) {
-            chatInterface.style.display = 'block'; // Show chat interface
+    chrome.storage.local.get('userProfileSubmitted', (result) => {
+        if (result.userProfileSubmitted) {
+            // User has submitted profile, show chat interface
             profileForm.style.display = 'none';
+            chatInterface.style.display = 'block';
         } else {
-            profileForm.style.display = 'block'; // Show the form
+            // User has not submitted profile, show profile form
+            profileForm.style.display = 'block';
             chatInterface.style.display = 'none';
         }
     });
 
-    // Handle form submission
-    const submitButton = document.getElementById('submitProfile');
     submitButton.addEventListener('click', (event) => {
-        event.preventDefault(); // Prevent default form submission
-
-        const displayName = document.getElementById('displayName').value;
-        const age = document.getElementById('age').value;
-
-        // Basic validation
-        if (displayName && age) {
-            chrome.storage.local.set({ displayName, age }, () => {
-                profileForm.style.display = 'none'; // Show chat interface
-                chatInterface.style.display = 'block';
-            });
-        } else {
-            alert('Please enter both your name and age.'); // Handle invalid input
-        }
+        event.preventDefault();
+        // Save submission state to local storage
+        chrome.storage.local.set({ userProfileSubmitted: true }, () => {
+            console.log('User profile has been submitted.');
+            // Show chat interface
+            profileForm.style.display = 'none';
+            chatInterface.style.display = 'block';
+        });
     });
 }
 
