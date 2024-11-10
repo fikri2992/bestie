@@ -1,6 +1,7 @@
 
 # Unpublished Chrome Extension
 
+This project is submitted to **Google's Women Techmakers presents She Builds AI: Develop an AI powered solution to address gender equity challenges around the world, as outlined in UN Sustainable Development Goal 5 - Devpost**.
 
 
 This is an unpublished Chrome extension project. This README provides instructions on how to set up, install, and run the extension locally for development and testing purposes.
@@ -83,7 +84,10 @@ to open extension you can just start click on the Bestie Icon on your extensions
 -   `popup.js`: Contains the JavaScript code for the popup's functionality.
 -   `popup.css`: CSS styles for the popup UI.
 -   `background.js`: Contains background scripts for persistent tasks.
--   `content.js/`: Contain script that will be injected to client webpages.
+-   `content.js/`: This script is injected into web pages to handle image and text censorship. It blurs images deemed inappropriate based on classification results and censors text containing specified bad words. It also listens for messages to toggle censorship features and interacts with the background script for image analysis.
+-   `js/`: This folder contains libraries such as TensorFlow.js (`tf.min.js`) and NSFW.js (`nsfwjs.min.js`) used for machine learning and image classification tasks.
+-   `offscreen.js`: This script handles the loading and usage of the NSFW.js model to analyze images for content classification. It listens for messages to load the model and analyze images, returning predictions or errors.
+-   `offscreen.html`: An HTML document that loads the necessary scripts (`tf.min.js`,  `nsfwjs.min.js`, and  `offscreen.js`) to perform offscreen tasks such as image analysis using TensorFlow.js and NSFW.js.
 
 # Lisence
 This project is licensed under the [MIT License](https://mit-license.org/).
