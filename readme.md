@@ -24,10 +24,6 @@ This is an unpublished Chrome extension project. This README provides instructio
 
 - [Key Files](#key-files)
 
-- [Running in Development Mode](#running-in-development-mode)
-
-- [Contributing](#contributing)
-
 - [License](#license)
 
 
