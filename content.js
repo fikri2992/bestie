@@ -540,24 +540,48 @@ if (window !== window.top) {
         async function askBestieAboutImage(state, imageUrl) {
             try {
                 console.log('Asking Bestie about image:', imageUrl);
-                const [imageResponse, screenshotBlob] = await Promise.all([
-                    fetch(imageUrl, { mode: 'cors',  credentials: 'include' }),
-                    captureScreenshot()
-                ]);
+        
+                let imageResponse, screenshotBlob;
+        
+                try {
+                    [imageResponse, screenshotBlob] = await Promise.all([
+                        fetch(imageUrl, { mode: 'cors' }),
+                        captureScreenshot()
+                    ]);
+                } catch (error) {
+                    if (error.response && error.response.status === 401) {
+                        try {
+                            [imageResponse, screenshotBlob] = await Promise.all([
+                                fetch(imageUrl, { mode: 'cors', credentials: 'include' }),
+                                captureScreenshot()
+                            ]);
+                        } catch (retryError) {
+                            console.error('Error retrying image fetch with credentials:', retryError);
+                            alert("Cannot download image. Please try again later.");
+                            return;
+                        }
+                    } else {
+                        console.error('Error fetching image:', error);
+                        alert("Cannot download image. Please try again later.");
+                        return;
+                    }
+                }
+        
                 const imageBlob = await imageResponse.blob();
-    
+        
                 // Convert Blobs to base64-encoded strings
                 const imageBase64 = await new Promise(resolve => {
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result.split(',')[1]);
                     reader.readAsDataURL(imageBlob);
                 });
+        
                 const screenshotBase64 = await new Promise(resolve => {
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result.split(',')[1]);
                     reader.readAsDataURL(screenshotBlob);
                 });
-    
+        
                 // Send the base64-encoded strings and MIME types to the background script
                 chrome.runtime.sendMessage({
                     action: 'openPopup',
@@ -568,8 +592,10 @@ if (window !== window.top) {
                 });
             } catch (error) {
                 console.error('Error asking Bestie about image:', error);
+                alert("An error occurred. Please try again later.");
             }
         }
+        
         async function captureScreenshot() {
             const screenshotBlob = await new Promise(resolve => {
                 chrome.runtime.sendMessage({ action: 'captureScreenshot' }, (screenshotUrl) => {
