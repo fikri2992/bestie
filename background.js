@@ -305,13 +305,19 @@ async function handleAskImageBestie(message) {
         saveChatMessage(data, () => {
         });
     } catch (error) {
+        const data = {
+            text: "Sorry, I couldn't process your request. Please try again later. (seems like gemini currently overloaded or you are offline)",
+            sender: "server"
+        };
         console.error('Error asking Bestie about image:', error);
         chrome.runtime.sendMessage({
             type: 'LOADING_CHAT_END'
         });
         chrome.runtime.sendMessage({
-            type: 'DISPLAY_ERROR',
-            error: error.message
+            type: 'DISPLAY_MESSAGE',
+            data
+        });
+        saveChatMessage(data, () => {
         });
     }
 }
@@ -357,13 +363,19 @@ async function handleAskTextBestie(selectedText, screenshotBlob) {
         saveChatMessage(data, () => {
         });
     } catch (error) {
-        console.error('Error asking Bestie about text:', error);
+        const data = {
+            text: "Sorry, I couldn't process your request. Please try again later. (seems like gemini currently overloaded or you are offline)",
+            sender: "server"
+        };
+        console.error('Error asking Bestie about image:', error);
         chrome.runtime.sendMessage({
             type: 'LOADING_CHAT_END'
         });
         chrome.runtime.sendMessage({
-            type: 'DISPLAY_ERROR',
-            error: error.message
+            type: 'DISPLAY_MESSAGE',
+            data
+        });
+        saveChatMessage(data, () => {
         });
     }
 }
@@ -408,6 +420,20 @@ async function sendPayload(messageData) {
                 saveChatMessage(data, () => {
                 });
             } else {
+                const data = {
+                    text: "Sorry, I couldn't process your request. Please try again later. (seems like gemini currently overloaded or you are offline)",
+                    sender: "server"
+                };
+                console.error('Error asking Bestie about image:', error);
+                chrome.runtime.sendMessage({
+                    type: 'LOADING_CHAT_END'
+                });
+                chrome.runtime.sendMessage({
+                    type: 'DISPLAY_MESSAGE',
+                    data
+                });
+                saveChatMessage(data, () => {
+                });
                 throw new Error(`API request failed with status ${response.status}`);
             }
         });

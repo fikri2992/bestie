@@ -537,6 +537,39 @@ if (window !== window.top) {
                 console.error('Error in blurFocusedImage:', error);
             }
         }
+        async function fetchImage(imageUrl) {
+            const maxRetries = 3;
+            let attempt = 0;
+        
+            while (attempt < maxRetries) {
+                try {
+                    // Attempt to fetch the image with CORS mode
+                    const response = await fetch(imageUrl, { mode: 'cors' });
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response;
+                } catch (error) {
+                    console.error(`Fetch attempt ${attempt + 1} failed:`, error);
+        
+                    // Retry with credentials: 'include' if an error occurs
+                    if (attempt === 0) {
+                        try {
+                            const response = await fetch(imageUrl, { mode: 'cors', credentials: 'include' });
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response;
+                        } catch (retryError) {
+                            console.error(`Retry with credentials failed:`, retryError);
+                        }
+                    }
+                }
+                attempt++;
+            }
+        
+            throw new Error('Failed to fetch image after multiple attempts');
+        }
         async function askBestieAboutImage(state, imageUrl) {
             try {
                 console.log('Asking Bestie about image:', imageUrl);
@@ -545,10 +578,11 @@ if (window !== window.top) {
         
                 try {
                     [imageResponse, screenshotBlob] = await Promise.all([
-                        fetch(imageUrl, { mode: 'cors' }),
+                        fetchImage(imageUrl),
                         captureScreenshot()
                     ]);
                 } catch (error) {
+                    console.log('Error fetching image:', error);
                     if (error.response && error.response.status === 401) {
                         try {
                             [imageResponse, screenshotBlob] = await Promise.all([
