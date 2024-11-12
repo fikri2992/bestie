@@ -372,6 +372,7 @@ if (window !== window.top) {
                         currentUrl: window.location.href
                     });
                 } else if (message.action === 'toggleShowLabels') {
+                    console.log('Toggling show labels:', message.showLabels);
                     const newState = {
                         ...state,
                         showLabels: message.showLabels
@@ -391,6 +392,17 @@ if (window !== window.top) {
                             }, 100);
                         } else {
                             state.strictMode = false;
+                            updateEnabledState(state);
+                        }
+                    } else {
+                        const confirmReload = confirm('Strict mode is now disabled. This will reload the page. Do you want to continue?');
+                        if (confirmReload) {
+                            updateEnabledState(state);
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 100);
+                        } else {
+                            state.strictMode = true;
                             updateEnabledState(state);
                         }
                     }
@@ -837,7 +849,7 @@ if (window !== window.top) {
                     window.lastMouseX = event.clientX;
                     window.lastMouseY = event.clientY;
                 }
-            }, 200); // 50ms debounce time
+            }, 100); // 50ms debounce time
 
             document.addEventListener('mousemove', debouncedMouseMove);
 
@@ -871,11 +883,14 @@ if (window !== window.top) {
                 }
                 
                 if (state.censorEnabled) {
-                    censorAllImages(state);
+                    // censorAllImages(state);
                     observeNewImages(state);
                     censorBadWords(state);
                     observeNewTextNodes(state);
                 }
+                // setTimeout(() => {
+                //     censorAllImages(state);
+                // }, 500);
                 // toggleLabels(state.showLabels);
             } catch (error) {
                 console.error('Error loading NSFWJS:', error);
